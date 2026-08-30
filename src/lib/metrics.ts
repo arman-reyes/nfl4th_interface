@@ -1,4 +1,4 @@
-import type { Band, Play, TeamSummary } from '../types'
+import type { Band, Choice, Play, TeamSummary } from '../types'
 import { actualChoice, agreed, modelChoice, wpForfeited } from './decision'
 import { BANDS, FIELD_ZONES, fieldZone, playBand } from './zones'
 import type { FieldZone } from './zones'
@@ -108,4 +108,39 @@ export function deviationGrid(plays: Play[]): DeviationCell[] {
     cell.rate = cell.decisions > 0 ? cell.deviations / cell.decisions : null
   }
   return [...cells.values()]
+}
+
+export const CHOICES: readonly Choice[] = ['go', 'fg', 'punt']
+
+export interface MatrixRow {
+  /** What the model recommended. */
+  model: Choice
+  total: number
+  /** What the staff actually did, counted. */
+  counts: Record<Choice, number>
+}
+
+/**
+ * What the staff did against what the model asked for, as a 3x3 tally.
+ *
+ * The diagonal is agreement; everything off it is where a staff's habits show.
+ * Reading a row answers the question a scout actually has: "when the model
+ * wanted them to go, what did they do instead?"
+ */
+export function choiceMatrix(plays: Play[]): MatrixRow[] {
+  const rows: MatrixRow[] = CHOICES.map((model) => ({
+    model,
+    total: 0,
+    counts: { go: 0, fg: 0, punt: 0 },
+  }))
+
+  for (const play of plays) {
+    const actual = actualChoice(play)
+    if (actual === null) continue
+    const row = rows.find((r) => r.model === modelChoice(play))
+    if (!row) continue
+    row.total += 1
+    row.counts[actual] += 1
+  }
+  return rows
 }

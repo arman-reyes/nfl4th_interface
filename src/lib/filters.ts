@@ -35,6 +35,11 @@ export function weekLabel(week: number): string {
   return POSTSEASON[week] ?? String(week)
 }
 
+/** "Wk 7" in the regular season, "WC" / "DIV" / "CONF" / "SB" after it. */
+export function weekShortLabel(week: number): string {
+  return POSTSEASON[week] ?? `Wk ${week}`
+}
+
 export function weekLongLabel(week: number): string {
   const round: Record<number, string> = {
     19: 'Wild Card',

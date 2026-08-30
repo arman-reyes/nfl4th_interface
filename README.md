@@ -146,9 +146,36 @@ level offers only the values the level above actually contains, so no filter can
 lead to an empty screen, and switching teams cannot strand you on a week the new
 team did not play (`reconcile` in `lib/filters.ts`).
 
-Selecting a play opens the comparison, which reads in review order: the
+The team's season summary is the landing view and the resting state. Selecting
+a play swaps it for that play's comparison, which reads in review order: the
 situation; what the staff did set against what the model wanted; every option
-priced row by row; and what going for it actually risked.
+priced row by row; and what going for it actually risked. Clearing the
+selection — from the back control, or by tapping the open row again — brings
+the summary back.
+
+### The season summary
+
+Scoped to the season, not to the week and quarter chips: those narrow the list
+so a play can be found, while the summary answers what the staff did across the
+year.
+
+- **Headline metrics** — aggressiveness, agreement, win probability given up per
+  game and across the season.
+- **Decisions against the model** — a 3x3 tally of what the model asked for
+  against what the staff did. The diagonal is agreement; reading a row answers
+  the scouting question directly, and it is where a staff's habits show. A
+  conservative staff has a fat *model said GO → they punted* cell and almost
+  nothing off the diagonal elsewhere.
+- **Where the calls cost most** — the games that gave away the most while still
+  live, split into losses and wins. Both columns rank on the same number, which
+  is the point of showing them together: the cost of a decision is fixed when it
+  is made, and the result afterwards does not change it. The wins column is the
+  honest counterweight to the losses column, not a separate metric. Clicking a
+  game narrows the list to that week.
+
+Win probability is an expected value. A game near the top of either column is
+one where the 4th-down calls gave away the most, not one where the result would
+have been different.
 
 ### Responsive behaviour
 
@@ -156,7 +183,7 @@ priced row by row; and what going for it actually risked.
 |---|---|
 | Below 640px | Everything stacks. The outcome panels sit one above the other, the options table drops its bar column and leans on the numbers, and selecting a play replaces the list with the comparison plus a back link. |
 | 640–1023px | Outcome panels go side by side; the list and the comparison are still two steps. |
-| 1024px and up | The list and the comparison sit side by side, with the comparison sticky as the list scrolls. |
+| 1024px and up | The shell is pinned to the viewport and the two panes scroll independently, so a long play list never scrolls the summary out of reach and a tall summary stays fully readable. |
 
 Filter rows scroll sideways rather than wrapping, so an eighteen-week season
 stays one row on a phone.
