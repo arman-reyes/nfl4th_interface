@@ -47,8 +47,18 @@ export function options(play: Play): Option[] {
  */
 export function modelChoice(play: Play): Choice {
   if (play.go_boost > 0) return 'go'
+  return bestNonGo(play) ?? 'go'
+}
+
+/**
+ * The better of the kick and the punt: the option `go_boost` is measured
+ * against. Null only if the situation allows neither, which nfl4th's own
+ * filter makes unreachable in practice.
+ */
+export function bestNonGo(play: Play): Choice | null {
   const fg = play.fg_wp
   const punt = play.punt_wp
+  if (fg == null && punt == null) return null
   if (fg == null) return 'punt'
   if (punt == null) return 'fg'
   return fg >= punt ? 'fg' : 'punt'
@@ -71,7 +81,10 @@ export function wpForfeited(play: Play): number | null {
   if (actual === null) return null
   const chosen = wpOf(play, actual)
   if (chosen == null) return null
-  const best = options(play)[0].wp
+  // Measured against the model's recommendation rather than a raw argmax, so
+  // that agreeing with the model always costs exactly zero.
+  const best = wpOf(play, modelChoice(play))
+  if (best == null) return null
   return Math.max(0, (best - chosen) * 100)
 }
 
@@ -104,4 +117,11 @@ export const CHOICE_LABEL: Record<Choice, string> = {
   go: 'Go for it',
   fg: 'Field goal',
   punt: 'Punt',
+}
+
+/** Reads naturally after "over ...", which CHOICE_LABEL does not. */
+export const CHOICE_PHRASE: Record<Choice, string> = {
+  go: 'going for it',
+  fg: 'the field goal',
+  punt: 'the punt',
 }

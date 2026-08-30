@@ -15,6 +15,17 @@ export function points(value: number, digits = 1): string {
   return value.toFixed(digits)
 }
 
+/**
+ * A percentage-point gap, rounded to a tenth but never rounded to nothing.
+ * On a genuine coin flip the gap really is a few hundredths, and printing
+ * "0.0 points" next to a verdict makes the card look broken rather than close.
+ */
+export function pointsGap(value: number): string {
+  const v = Math.abs(value)
+  if (v < 0.05) return 'under 0.1'
+  return v.toFixed(1)
+}
+
 /** "3rd" for a quarter number; overtime periods read as OT. */
 export function quarterLabel(qtr: number): string {
   if (qtr >= 5) return 'OT'

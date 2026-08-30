@@ -25,3 +25,6 @@ dist-ssr
 
 # Generated data. Rebuild with `npm run data:fixture` or the R pipeline.
 public/data/
+
+# Local Python venv, only used while probing the data sources
+.venv/

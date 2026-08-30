@@ -4,6 +4,7 @@ import type { Play } from '../../types'
 export function makePlay(overrides: Partial<Play> = {}): Play {
   return {
     game_id: '2024_05_LV_KC',
+    play_id: 1234,
     desc: 'test play',
     season: 2024,
     week: 5,

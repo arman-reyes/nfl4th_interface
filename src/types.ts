@@ -19,6 +19,8 @@ export type TeamAbbr = string
  */
 export interface Play {
   game_id: string
+  /** Unique within a game; game_id + play_id is the stable key for a play. */
+  play_id: number
   desc: string
   season: number
   week: number

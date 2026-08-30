@@ -20,8 +20,17 @@ npm run dev
 Three stages, two of which you run yourself.
 
 **1. R — extract the model output.** `scripts/extract.R` loads six seasons of 4th
-downs, keeps the `nfl4th` probability columns, and writes one JSON file per team to
+downs, runs `nfl4th::add_4th_probs()`, and writes one JSON file per team to
 `public/data/teams/` plus the raw team metadata to `public/data/index.json`.
+
+```bash
+Rscript scripts/extract.R    # ~25 minutes for 2020-2025
+```
+
+Needs R with `nfl4th`, `nflreadr`, `dplyr`, `purrr` and `jsonlite`. Seasons are
+processed one at a time and reduced to 4th downs immediately, because a full
+play-by-play frame for six seasons does not want to be in memory at once. The
+current data is 25,093 fourth downs across all 32 teams, 2020-2025.
 
 **2. Node — build the index.** `npm run data:index` reads those files and rewrites
 `public/data/index.json` with precomputed per-season tendency metrics for all 32
