@@ -78,15 +78,19 @@ export function PlayFilters({ plays, team, filter, onChange }: Props) {
   )
 }
 
+/**
+ * Chips wrap to fit whatever width they are given rather than scrolling
+ * sideways. An 18-week season does not fit a 22rem pane on one line, and a
+ * strip that scrolls hides half the season behind an affordance the reader has
+ * to discover. Wrapping costs a little height and hides nothing.
+ */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-14 shrink-0 text-[0.625rem] font-bold tracking-[0.14em] text-stone-400 uppercase sm:w-16 sm:text-xs">
+    <div className="flex items-start gap-3">
+      <span className="w-14 shrink-0 pt-1.5 text-[0.625rem] font-bold tracking-[0.14em] text-stone-400 uppercase sm:w-16 sm:text-xs">
         {label}
       </span>
-      <div className="-mx-1 flex flex-1 gap-1.5 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {children}
-      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">{children}</div>
     </div>
   )
 }
@@ -113,7 +117,7 @@ function Chip({ team, selected, onClick, children }: ChipProps) {
       onClick={onClick}
       style={style}
       aria-pressed={selected}
-      className={`tnum shrink-0 rounded border px-2.5 py-1 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none ${
+      className={`tnum flex min-w-9 shrink-0 justify-center rounded border px-2 py-1 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none ${
         selected ? '' : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'
       }`}
     >

@@ -185,8 +185,10 @@ have been different.
 | 640–1023px | Outcome panels go side by side; the list and the comparison are still two steps. |
 | 1024px and up | The shell is pinned to the viewport and the two panes scroll independently, so a long play list never scrolls the summary out of reach and a tall summary stays fully readable. |
 
-Filter rows scroll sideways rather than wrapping, so an eighteen-week season
-stays one row on a phone.
+Filter chips wrap to whatever width they are given rather than scrolling
+sideways. An 18-week season does not fit a 22rem pane on one line, and a strip
+that scrolls hides half the season behind an affordance the reader has to
+discover. Wrapping costs a little height and hides nothing.
 
 ### Team colour
 
