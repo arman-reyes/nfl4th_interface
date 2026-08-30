@@ -23,7 +23,8 @@ KEEP <- c(
   "game_id", "play_id", "desc", "season", "week", "qtr",
   "quarter_seconds_remaining", "posteam", "defteam", "ydstogo", "yardline_100",
   "score_differential", "posteam_timeouts_remaining", "defteam_timeouts_remaining",
-  "play_type", "go_boost", "first_down_prob", "wp_fail", "wp_succeed", "go_wp",
+  "play_type", "posteam_home", "posteam_final_score", "defteam_final_score",
+  "go_boost", "first_down_prob", "wp_fail", "wp_succeed", "go_wp",
   "fg_make_prob", "make_fg_wp", "miss_fg_wp", "fg_wp", "punt_wp"
 )
 
@@ -36,6 +37,14 @@ season_plays <- function(season) {
   fourth |>
     nfl4th::add_4th_probs() |>
     filter(!is.na(posteam), !is.na(go_boost)) |>
+    # home_score and away_score are the game's final scores, not the running
+    # ones; restated from the offence's side so a team file needs no lookup to
+    # say how the game it is looking at ended.
+    mutate(
+      posteam_home = posteam == home_team,
+      posteam_final_score = if_else(posteam == home_team, home_score, away_score),
+      defteam_final_score = if_else(posteam == home_team, away_score, home_score)
+    ) |>
     select(all_of(KEEP))
 }
 

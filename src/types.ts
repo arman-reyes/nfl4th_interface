@@ -38,6 +38,16 @@ export interface Play {
   /** What the staff actually did. Mapped to a Choice by `actualChoice()`. */
   play_type: string | null
 
+  /** True when the offence was the home team in this game. */
+  posteam_home: boolean
+  /**
+   * The game's *final* score, restated from the offence's side, so a team file
+   * can say how a game ended without a second lookup. Null only for a game
+   * with no recorded result.
+   */
+  posteam_final_score: number | null
+  defteam_final_score: number | null
+
   /** Win probability gained by going for it, in percentage points. */
   go_boost: number
   first_down_prob: number

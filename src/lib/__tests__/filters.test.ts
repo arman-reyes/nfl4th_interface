@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ALL, applyFilter, groupByGame, quartersOf, reconcile, weekLabel, weeksOf } from '../filters'
+import {
+  ALL,
+  applyFilter,
+  gameResult,
+  groupByGame,
+  quartersOf,
+  reconcile,
+  weekLabel,
+  weeksOf,
+} from '../filters'
 import { makePlay } from './fixtures'
 
 const plays = [
@@ -75,6 +84,14 @@ describe('groupByGame', () => {
     makePlay({ game_id: 'b', week: 2, defteam: 'SEA' }),
   ]
 
+  it('carries the venue and the final score onto the group', () => {
+    const groups = groupByGame([
+      makePlay({ game_id: 'a', posteam_home: false, posteam_final_score: 17, defteam_final_score: 31 }),
+    ])
+    expect(groups[0].home).toBe(false)
+    expect(groups[0].result).toEqual({ outcome: 'L', for: 17, against: 31 })
+  })
+
   it('collects consecutive plays from the same game', () => {
     const groups = groupByGame(ordered)
     expect(groups.map((g) => g.gameId)).toEqual(['a', 'b'])
@@ -88,5 +105,31 @@ describe('groupByGame', () => {
 
   it('handles an empty list', () => {
     expect(groupByGame([])).toEqual([])
+  })
+})
+
+describe('gameResult', () => {
+  it('reads the final score from the viewed team’s side', () => {
+    expect(gameResult(makePlay({ posteam_final_score: 28, defteam_final_score: 14 }))).toEqual({
+      outcome: 'W',
+      for: 28,
+      against: 14,
+    })
+    expect(gameResult(makePlay({ posteam_final_score: 14, defteam_final_score: 28 }))).toEqual({
+      outcome: 'L',
+      for: 14,
+      against: 28,
+    })
+  })
+
+  it('handles a tie, which the NFL still allows', () => {
+    expect(gameResult(makePlay({ posteam_final_score: 20, defteam_final_score: 20 }))?.outcome).toBe(
+      'T',
+    )
+  })
+
+  it('is null when the game has no recorded result', () => {
+    expect(gameResult(makePlay({ posteam_final_score: null }))).toBeNull()
+    expect(gameResult(makePlay({ defteam_final_score: null }))).toBeNull()
   })
 })

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Play, TeamMeta } from '../types'
 import { groupByGame, playKey, weekLongLabel } from '../lib/filters'
+import type { GameResult } from '../lib/filters'
 import { PlayRow } from './PlayRow'
 import { TeamPill } from './TeamPill'
 
@@ -28,10 +29,11 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
       <ul className="overflow-hidden rounded-lg border border-stone-200 bg-white">
         {games.map((game) => (
         <li key={game.gameId}>
-          <h3 className="flex items-center gap-2 border-y border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-600 first:border-t-0">
+          <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 border-y border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-600 first:border-t-0">
             {weekLongLabel(game.week)}
-            <span className="text-stone-400">vs</span>
+            <span className="font-normal text-stone-400">{game.home ? 'vs' : 'at'}</span>
             <TeamPill abbr={game.opponent} />
+            {game.result && <Result result={game.result} />}
             <span className="ml-auto font-normal text-stone-400">
               {game.plays.length} 4th {game.plays.length === 1 ? 'down' : 'downs'}
             </span>
@@ -55,6 +57,35 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
         ))}
       </ul>
     </>
+  )
+}
+
+// Deliberately neutral. A green W sitting next to the cost meter would invite
+// reading the result as a verdict on the decision, and the whole point of
+// judging a 4th down on win probability is that it does not depend on how the
+// game happened to end.
+const OUTCOME_TONE: Record<GameResult['outcome'], string> = {
+  W: 'bg-stone-800 text-white',
+  L: 'bg-stone-200 text-stone-600',
+  T: 'bg-stone-300 text-stone-700',
+}
+
+/** The final score, from the viewed team's side. */
+function Result({ result }: { result: GameResult }) {
+  return (
+    <span
+      className="tnum inline-flex items-center gap-1"
+      title={`Final: ${result.for}-${result.against}`}
+    >
+      <span
+        className={`rounded-xs px-1 py-px text-[0.625rem] font-bold ${OUTCOME_TONE[result.outcome]}`}
+      >
+        {result.outcome}
+      </span>
+      <span className="font-semibold text-stone-500">
+        {result.for}–{result.against}
+      </span>
+    </span>
   )
 }
 

@@ -102,7 +102,30 @@ export interface GameGroup {
   gameId: string
   week: number
   opponent: string
+  /** True when the team being viewed played this one at home. */
+  home: boolean
+  result: GameResult | null
   plays: Play[]
+}
+
+export interface GameResult {
+  /** From the viewed team's side. */
+  outcome: 'W' | 'L' | 'T'
+  for: number
+  against: number
+}
+
+/**
+ * The final score from the viewed team's side. Every play in a team file has
+ * that team as `posteam`, so the offence's columns are already the right way
+ * round.
+ */
+export function gameResult(play: Play): GameResult | null {
+  const scoreFor = play.posteam_final_score
+  const scoreAgainst = play.defteam_final_score
+  if (scoreFor == null || scoreAgainst == null) return null
+  const outcome = scoreFor > scoreAgainst ? 'W' : scoreFor < scoreAgainst ? 'L' : 'T'
+  return { outcome, for: scoreFor, against: scoreAgainst }
 }
 
 /**
@@ -125,6 +148,8 @@ export function groupByGame(plays: Play[]): GameGroup[] {
       gameId: play.game_id,
       week: play.week,
       opponent: play.defteam,
+      home: play.posteam_home,
+      result: gameResult(play),
       plays: [play],
     })
   }

@@ -1,6 +1,6 @@
 import type { Play, TeamMeta } from '../../types'
 import { clock, fieldSpot, quarterLabel, scoreLine, situationLine } from '../../lib/format'
-import { weekLongLabel } from '../../lib/filters'
+import { gameResult, weekLongLabel } from '../../lib/filters'
 import { accentOnLight } from '../../lib/color'
 import { FieldSpotLabel, TeamPill } from '../TeamPill'
 
@@ -12,6 +12,9 @@ interface Props {
 /** The situation, stated the way it would be said out loud. */
 export function SituationHeader({ play, team }: Props) {
   const accent = team ? accentOnLight(team.team_abbr) : '#1c1917'
+  // Stated plainly rather than as a badge: the card is reviewing a decision,
+  // and the decision is judged on win probability, not on how the game ended.
+  const result = gameResult(play)
   return (
     <header className="border-b border-stone-200 pb-4">
       <h2
@@ -41,7 +44,13 @@ export function SituationHeader({ play, team }: Props) {
         <Divider />
         <Fact label="Game">
           <span className="inline-flex items-center gap-1.5">
-            {play.season} {weekLongLabel(play.week)} vs <TeamPill abbr={play.defteam} />
+            {play.season} {weekLongLabel(play.week)} {play.posteam_home ? 'vs' : 'at'}{' '}
+            <TeamPill abbr={play.defteam} />
+            {result && (
+              <span className="tnum font-normal text-stone-500">
+                {result.outcome} {result.for}–{result.against}
+              </span>
+            )}
           </span>
         </Fact>
       </dl>

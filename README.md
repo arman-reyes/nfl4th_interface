@@ -73,6 +73,7 @@ Every number in the interface traces to a field in the data or to one of these:
 | Game state | How live the game was, from the win probability carried by the model's own recommendation: *in doubt* inside 35–65%, *leaning* to 15/85, *lopsided* to 5/95, *decided* beyond it. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
 | Field goal distance | `yardline_100 + 17` — ten yards of end zone plus a seven-yard snap. Shown as context on the field-goal row; the model's own `fg_make_prob` is what is displayed beside it. |
+| Game result | `home_score` and `away_score` are the game's *final* score, not the running one. The extract restates them from the offence's side as `posteam_final_score` / `defteam_final_score`, so a team file says how each game ended with no second lookup. Rendered W/L/T from the viewed team's point of view, alongside `posteam_home` as vs/at. |
 
 Win-probability fields are probabilities on a 0–1 scale. `go_boost` is the only field
 already expressed in percentage points.
