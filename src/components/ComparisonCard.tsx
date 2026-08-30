@@ -1,5 +1,5 @@
 import type { Play, TeamMeta } from '../types'
-import { actualChoice, band, modelChoice, wpForfeited } from '../lib/decision'
+import { actualChoice, band, modelChoice } from '../lib/decision'
 import { GoRisk } from './decision/GoRisk'
 import { OptionsTable } from './decision/OptionsTable'
 import { OutcomePanels } from './decision/OutcomePanels'
@@ -31,7 +31,6 @@ export function ComparisonCard({ play, team }: Props) {
         actual={actual}
         recommended={recommended}
         band={band(play.go_boost)}
-        forfeited={wpForfeited(play)}
       />
 
       <OptionsTable play={play} recommended={recommended} actual={actual} />

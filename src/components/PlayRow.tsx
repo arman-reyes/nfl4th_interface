@@ -1,9 +1,11 @@
 import type { Choice, Play, TeamMeta } from '../types'
-import { actualChoice, agreed, CHOICE_VERB, modelChoice, wpForfeited } from '../lib/decision'
-import { clock, fieldSpot, points, situationLine } from '../lib/format'
+import { actualChoice, CHOICE_VERB, modelChoice } from '../lib/decision'
+import { decisionImpact } from '../lib/impact'
+import { clock, fieldSpot, situationLine } from '../lib/format'
 import { quarterLabelShort } from '../lib/filters'
 import { teamSurface } from '../lib/color'
 import { FieldSpotLabel } from './TeamPill'
+import { ImpactMeter } from './ImpactMeter'
 
 interface Props {
   play: Play
@@ -63,25 +65,29 @@ export function PlayRow({ play, team, selected, onSelect }: Props) {
         </span>
       </span>
 
-      <Cost match={agreed(play)} cost={wpForfeited(play)} actual={actual} />
+      <Outcome impact={decisionImpact(play)} actual={actual} />
     </button>
   )
 }
 
-interface CostProps {
-  match: boolean | null
-  cost: number | null
+interface OutcomeProps {
+  impact: ReturnType<typeof decisionImpact>
   actual: Choice | null
 }
 
-function Cost({ match, cost, actual }: CostProps) {
+/** The right edge of a row: agreement, or how much the disagreement cost. */
+function Outcome({ impact, actual }: OutcomeProps) {
   if (actual === null) {
-    return <span className="w-14 shrink-0 text-right text-xs text-stone-300">—</span>
+    return (
+      <span className="w-16 shrink-0 text-right text-xs text-stone-300" title="No decision">
+        —
+      </span>
+    )
   }
-  if (match) {
+  if (impact === null) {
     return (
       <span
-        className="w-14 shrink-0 text-right text-xs font-semibold text-stone-400"
+        className="w-16 shrink-0 text-right text-xs font-semibold text-stone-400"
         title="Agreed with the model"
       >
         ✓
@@ -89,11 +95,8 @@ function Cost({ match, cost, actual }: CostProps) {
     )
   }
   return (
-    <span
-      className="tnum w-14 shrink-0 text-right text-sm font-bold text-amber-700"
-      title="Win probability forfeited"
-    >
-      −{points(cost ?? 0)}
+    <span className="flex w-16 shrink-0 justify-end">
+      <ImpactMeter impact={impact} />
     </span>
   )
 }

@@ -69,11 +69,42 @@ Every number in the interface traces to a field in the data or to one of these:
 | Aggressiveness | Of the 4th downs where the model recommended going, the share the staff actually went for. |
 | Agreement rate | Share of all classifiable 4th downs where the actual choice matched the model's top option. |
 | WP forfeited | Per play, (best option's WP − chosen option's WP) in percentage points; summed, and divided by games. |
+| Impact tier | The forfeited points banded on the same 1-and-3 scale as the strength band: *minor*, *notable*, *costly*. |
+| Game state | How live the game was, from the win probability carried by the model's own recommendation: *in doubt* inside 35–65%, *leaning* to 15/85, *lopsided* to 5/95, *decided* beyond it. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
 | Field goal distance | `yardline_100 + 17` — ten yards of end zone plus a seven-yard snap. Shown as context on the field-goal row; the model's own `fg_make_prob` is what is displayed beside it. |
 
 Win-probability fields are probabilities on a 0–1 scale. `go_boost` is the only field
 already expressed in percentage points.
+
+### Reading a disagreement
+
+A disagreement is reported on two axes, because the cost alone does not say why
+it is small.
+
+Win probability is already a linear currency, so the points forfeited need no
+leverage multiplier — applying one would double-count. The data bears this out.
+Of 6,749 disagreements across 2020–2025:
+
+| Game state at the decision | n | Mean cost | Max | Over 3 pts |
+|---|---|---|---|---|
+| In doubt (35–65%) | 1,767 | 1.85 | 13.8 | 18% |
+| Leaning (65–85%) | 2,245 | 1.47 | 13.0 | 11% |
+| Lopsided (85–95%) | 1,218 | 0.90 | 8.0 | 3% |
+| Decided (>95 / <5%) | 1,519 | 0.29 | 4.2 | 0% |
+
+None of the 125 disagreements costing more than five points happened in a game
+that was already decided, and decided games carry 5.4% of all forfeited win
+probability while making up 22.5% of the disagreements.
+
+So the cost already suppresses itself. What it does not do is distinguish a
+0.3-point call in a tie game — a close one the staff nearly got right — from
+0.3 points at a 97% win probability, which is garbage time and says nothing
+about how a staff decides. The play list therefore draws the cost tier as a
+three-segment meter, in amber when the game was live and in grey when it was
+already decided, and the comparison spells out which case it is. Decided-game
+disagreements still count against the agreement rate; they are marked, not
+excluded.
 
 ### What is deliberately absent
 

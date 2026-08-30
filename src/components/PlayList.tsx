@@ -23,8 +23,10 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
   }
 
   return (
-    <ul className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      {games.map((game) => (
+    <>
+      <Legend />
+      <ul className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        {games.map((game) => (
         <li key={game.gameId}>
           <h3 className="flex items-center gap-2 border-y border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-600 first:border-t-0">
             {weekLongLabel(game.week)}
@@ -50,7 +52,29 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
             })}
           </ul>
         </li>
-      ))}
-    </ul>
+        ))}
+      </ul>
+    </>
   )
+}
+
+/** What the right-hand column of each row is saying. */
+function Legend() {
+  return (
+    <p className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[0.6875rem] text-stone-500">
+      <span className="flex items-center gap-1">
+        <span className="font-semibold text-stone-400">✓</span> agreed
+      </span>
+      <span className="flex items-center gap-1">
+        <Swatch className="bg-amber-600" /> cost, 1 to 3 segments
+      </span>
+      <span className="flex items-center gap-1">
+        <Swatch className="bg-stone-400" /> game already decided
+      </span>
+    </p>
+  )
+}
+
+function Swatch({ className }: { className: string }) {
+  return <span aria-hidden className={`h-1.5 w-2.5 rounded-xs ${className}`} />
 }

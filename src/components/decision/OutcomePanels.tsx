@@ -1,7 +1,9 @@
 import type { Band, Choice, Play, TeamMeta } from '../../types'
 import { CHOICE_VERB } from '../../lib/decision'
-import { pct, pointsGap } from '../../lib/format'
+import { pct, points } from '../../lib/format'
 import { accentOnLight } from '../../lib/color'
+import { decisionImpact, GAME_STATE_NOTE } from '../../lib/impact'
+import type { DecisionImpact } from '../../lib/impact'
 import { BandMeter } from './BandMeter'
 
 interface Props {
@@ -10,7 +12,6 @@ interface Props {
   actual: Choice | null
   recommended: Choice
   band: Band
-  forfeited: number | null
 }
 
 const PAST_TENSE: Record<Choice, string> = {
@@ -24,7 +25,7 @@ const PAST_TENSE: Record<Choice, string> = {
  * What happened comes first because that is the thing being reviewed; the
  * model is the yardstick held up against it.
  */
-export function OutcomePanels({ play, team, actual, recommended, band, forfeited }: Props) {
+export function OutcomePanels({ play, team, actual, recommended, band }: Props) {
   const accent = team ? accentOnLight(team.team_abbr) : '#1c1917'
   const matched = actual !== null && actual === recommended
   const actualWp = actual === null ? null : actual === 'go' ? play.go_wp : actual === 'fg' ? play.fg_wp : play.punt_wp
@@ -57,7 +58,12 @@ export function OutcomePanels({ play, team, actual, recommended, band, forfeited
         />
       </div>
 
-      <VerdictStrip matched={matched} actual={actual} forfeited={forfeited} />
+      <VerdictStrip
+        matched={matched}
+        actual={actual}
+        impact={decisionImpact(play)}
+        modelWp={modelWp}
+      />
     </div>
   )
 }
@@ -98,11 +104,13 @@ function Panel({ heading, headingColor, rule, verdict, wp, note }: PanelProps) {
 function VerdictStrip({
   matched,
   actual,
-  forfeited,
+  impact,
+  modelWp,
 }: {
   matched: boolean
   actual: Choice | null
-  forfeited: number | null
+  impact: DecisionImpact | null
+  modelWp: number | null
 }) {
   if (actual === null) {
     return (
@@ -111,16 +119,40 @@ function VerdictStrip({
       </p>
     )
   }
-  if (matched) {
+  if (matched || impact === null) {
     return (
       <p className="rounded-md bg-stone-900 px-4 py-3 text-sm font-semibold tracking-wide text-white uppercase">
         Agreed with the model
       </p>
     )
   }
+
+  // A disagreement in a game already decided still disagreed, but at a 95%+ win
+  // probability it could not change much, and reading it in amber alongside a
+  // live-game call would overstate it.
+  const tone = impact.inert
+    ? 'bg-stone-100 text-stone-600 ring-stone-200'
+    : 'bg-amber-50 text-amber-900 ring-amber-200'
+
   return (
-    <p className="tnum rounded-md bg-amber-50 px-4 py-3 text-sm font-semibold tracking-wide text-amber-900 uppercase ring-1 ring-amber-200 ring-inset">
-      Disagreed — cost {pointsGap(forfeited ?? 0)} points of win probability
-    </p>
+    <div className={`tnum rounded-md px-4 py-3 text-sm ring-1 ring-inset ${tone}`}>
+      <p className="font-semibold tracking-wide uppercase">
+        Disagreed — cost {points(impact.cost)} points of win probability
+      </p>
+      <p className="mt-1 text-xs">
+        {impact.inert ? (
+          <>
+            The game was already decided{modelWp === null ? '' : ` at ${pct(modelWp, 1)}`}, so there
+            was little left for this call to change — though it still counts against the agreement
+            rate.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold capitalize">{impact.tier}</span>, with the{' '}
+            {GAME_STATE_NOTE[impact.state]}.
+          </>
+        )}
+      </p>
+    </div>
   )
 }
