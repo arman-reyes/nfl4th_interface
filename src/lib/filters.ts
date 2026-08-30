@@ -1,0 +1,99 @@
+import type { Play } from '../types'
+
+/**
+ * The drill-down: team, then season, then week, then quarter, then the
+ * individual 4th down. Each level offers only the values the level above
+ * actually contains, so no filter can lead to an empty screen.
+ */
+
+export const ALL = 'all' as const
+export type All = typeof ALL
+
+export interface PlayFilter {
+  season: number
+  week: number | All
+  qtr: number | All
+}
+
+/** Stable identity for a play. game_id alone repeats across a team's history. */
+export function playKey(play: Play): string {
+  return `${play.game_id}:${play.play_id}`
+}
+
+/**
+ * nflverse numbers the postseason straight on from the regular season. Coaches
+ * do not call it week 21.
+ */
+const POSTSEASON: Record<number, string> = {
+  19: 'WC',
+  20: 'DIV',
+  21: 'CONF',
+  22: 'SB',
+}
+
+export function weekLabel(week: number): string {
+  return POSTSEASON[week] ?? String(week)
+}
+
+export function weekLongLabel(week: number): string {
+  const round: Record<number, string> = {
+    19: 'Wild Card',
+    20: 'Divisional',
+    21: 'Conference',
+    22: 'Super Bowl',
+  }
+  return round[week] ?? `Week ${week}`
+}
+
+export function quarterLabelShort(qtr: number): string {
+  return qtr >= 5 ? 'OT' : `Q${qtr}`
+}
+
+function sortedUnique(values: number[]): number[] {
+  return [...new Set(values)].sort((a, b) => a - b)
+}
+
+export function seasonsOf(plays: Play[]): number[] {
+  return sortedUnique(plays.map((p) => p.season)).reverse()
+}
+
+export function weeksOf(plays: Play[], season: number): number[] {
+  return sortedUnique(plays.filter((p) => p.season === season).map((p) => p.week))
+}
+
+export function quartersOf(plays: Play[], season: number, week: number | All): number[] {
+  return sortedUnique(
+    plays.filter((p) => p.season === season && (week === ALL || p.week === week)).map((p) => p.qtr),
+  )
+}
+
+/** Plays matching the filter, in the order they were played. */
+export function applyFilter(plays: Play[], filter: PlayFilter): Play[] {
+  return plays
+    .filter(
+      (p) =>
+        p.season === filter.season &&
+        (filter.week === ALL || p.week === filter.week) &&
+        (filter.qtr === ALL || p.qtr === filter.qtr),
+    )
+    .sort(
+      (a, b) =>
+        a.week - b.week || a.qtr - b.qtr || b.quarter_seconds_remaining - a.quarter_seconds_remaining,
+    )
+}
+
+/**
+ * Repairs a filter against a team's actual data: keeps the current selection
+ * where it still exists, and otherwise falls back to the newest season and to
+ * "all". Called whenever the team changes, so switching teams never strands
+ * the user on a week the new team did not play.
+ */
+export function reconcile(plays: Play[], filter: PlayFilter | null): PlayFilter {
+  const seasons = seasonsOf(plays)
+  const season = filter && seasons.includes(filter.season) ? filter.season : (seasons[0] ?? 0)
+  const weeks = weeksOf(plays, season)
+  const week = filter && filter.week !== ALL && weeks.includes(filter.week) ? filter.week : ALL
+  const quarters = quartersOf(plays, season, week)
+  const qtr = filter && filter.qtr !== ALL && quarters.includes(filter.qtr) ? filter.qtr : ALL
+  return { season, week, qtr }
+}

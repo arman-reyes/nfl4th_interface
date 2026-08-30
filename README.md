@@ -70,6 +70,7 @@ Every number in the interface traces to a field in the data or to one of these:
 | Agreement rate | Share of all classifiable 4th downs where the actual choice matched the model's top option. |
 | WP forfeited | Per play, (best option's WP − chosen option's WP) in percentage points; summed, and divided by games. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
+| Field goal distance | `yardline_100 + 17` — ten yards of end zone plus a seven-yard snap. Shown as context on the field-goal row; the model's own `fg_make_prob` is what is displayed beside it. |
 
 Win-probability fields are probabilities on a 0–1 scale. `go_boost` is the only field
 already expressed in percentage points.
@@ -84,18 +85,59 @@ through the strength band and through the sensitivity strip's flip point.
 
 ```
 src/
-  types.ts            shapes of the static data and the derived domain types
-  data/client.ts      the only module that talks to storage, behind a DataSource interface
-  hooks/              useTeamData, useLeagueIndex — fetch, cache, loading state
-  lib/decision.ts     the decision rules: actual choice, model choice, cost, band
-  lib/metrics.ts      team tendency metrics, shared with the build script
-  lib/zones.ts        the two axes of the deviation grid
-  components/         the interface
+  types.ts                shapes of the static data and the derived domain types
+  data/client.ts          the only module that talks to storage, behind a DataSource interface
+  hooks/                  useTeamData, useLeagueIndex — fetch, cache, loading state
+  lib/decision.ts         the decision rules: actual choice, model choice, cost, band
+  lib/metrics.ts          team tendency metrics, shared with the build script
+  lib/filters.ts          the season / week / quarter drill-down
+  lib/scale.ts            the shared, floor-limited axis the option bars sit on
+  lib/color.ts            team colour with contrast checks
+  lib/zones.ts            the two axes of the deviation grid
+  components/
+    TeamPicker.tsx        all 32 teams, in their own colours
+    TeamBanner.tsx        sticky identity: team, season, plays in scope
+    PlayFilters.tsx       season, then week, then quarter
+    PlayList.tsx          every 4th down in the filter
+    ComparisonCard.tsx    one 4th down, reviewed
+    decision/             the parts of that card
 scripts/
-  extract.R           stage 1: nfl4th -> public/data/
-  build-index.ts      stage 2: precomputed summaries -> public/data/index.json
-  make-fixture.mjs    stand-in data for development
+  extract.R               stage 1: nfl4th -> public/data/
+  build-index.ts          stage 2: precomputed summaries -> public/data/index.json
+  make-fixture.mjs        stand-in data for development
 ```
+
+## The drill-down
+
+Team, then season, then week, then quarter, then the individual 4th down. Every
+level offers only the values the level above actually contains, so no filter can
+lead to an empty screen, and switching teams cannot strand you on a week the new
+team did not play (`reconcile` in `lib/filters.ts`).
+
+Selecting a play opens the comparison, which reads in review order: the
+situation; what the staff did set against what the model wanted; every option
+priced row by row; and what going for it actually risked.
+
+### Responsive behaviour
+
+| Width | Layout |
+|---|---|
+| Below 640px | Everything stacks. The outcome panels sit one above the other, the options table drops its bar column and leans on the numbers, and selecting a play replaces the list with the comparison plus a back link. |
+| 640–1023px | Outcome panels go side by side; the list and the comparison are still two steps. |
+| 1024px and up | The list and the comparison sit side by side, with the comparison sticky as the list scrolls. |
+
+Filter rows scroll sideways rather than wrapping, so an eighteen-week season
+stays one row on a phone.
+
+### Team colour
+
+Identity comes from colour and abbreviation only — no logos. Every use goes
+through a contrast check in `lib/color.ts`, because some primaries are near-black
+(LV, CHI) and some are near-yellow (PIT), and a palette that assumes either one
+breaks on the other. Text on a team-coloured fill picks white or ink by measured
+contrast; a team colour used as text on white is swapped for the secondary, or
+darkened, until it reaches 4.5:1. The banner also carries a thin stripe of the
+secondary colour so teams with a near-black primary still read as themselves.
 
 ## Commands
 
