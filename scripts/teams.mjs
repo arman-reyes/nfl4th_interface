@@ -1,0 +1,46 @@
+/**
+ * The 32 teams with nflverse abbreviations and colors, matching the shape of
+ * `nflreadr::load_teams()`. Used only to seed fixture data; the real
+ * public/data/index.json is regenerated from the R output.
+ */
+export const TEAMS = [
+  ['ARI', 'Arizona Cardinals', 'NFC', 'NFC West', '#97233F', '#000000'],
+  ['ATL', 'Atlanta Falcons', 'NFC', 'NFC South', '#A71930', '#000000'],
+  ['BAL', 'Baltimore Ravens', 'AFC', 'AFC North', '#241773', '#9E7C0C'],
+  ['BUF', 'Buffalo Bills', 'AFC', 'AFC East', '#00338D', '#C60C30'],
+  ['CAR', 'Carolina Panthers', 'NFC', 'NFC South', '#0085CA', '#101820'],
+  ['CHI', 'Chicago Bears', 'NFC', 'NFC North', '#0B162A', '#C83803'],
+  ['CIN', 'Cincinnati Bengals', 'AFC', 'AFC North', '#FB4F14', '#000000'],
+  ['CLE', 'Cleveland Browns', 'AFC', 'AFC North', '#311D00', '#FF3C00'],
+  ['DAL', 'Dallas Cowboys', 'NFC', 'NFC East', '#003594', '#869397'],
+  ['DEN', 'Denver Broncos', 'AFC', 'AFC West', '#FB4F14', '#002244'],
+  ['DET', 'Detroit Lions', 'NFC', 'NFC North', '#0076B6', '#B0B7BC'],
+  ['GB', 'Green Bay Packers', 'NFC', 'NFC North', '#203731', '#FFB612'],
+  ['HOU', 'Houston Texans', 'AFC', 'AFC South', '#03202F', '#A71930'],
+  ['IND', 'Indianapolis Colts', 'AFC', 'AFC South', '#002C5F', '#A2AAAD'],
+  ['JAX', 'Jacksonville Jaguars', 'AFC', 'AFC South', '#006778', '#9F792C'],
+  ['KC', 'Kansas City Chiefs', 'AFC', 'AFC West', '#E31837', '#FFB81C'],
+  ['LA', 'Los Angeles Rams', 'NFC', 'NFC West', '#003594', '#FFA300'],
+  ['LAC', 'Los Angeles Chargers', 'AFC', 'AFC West', '#0080C6', '#FFC20E'],
+  ['LV', 'Las Vegas Raiders', 'AFC', 'AFC West', '#000000', '#A5ACAF'],
+  ['MIA', 'Miami Dolphins', 'AFC', 'AFC East', '#008E97', '#FC4C02'],
+  ['MIN', 'Minnesota Vikings', 'NFC', 'NFC North', '#4F2683', '#FFC62F'],
+  ['NE', 'New England Patriots', 'AFC', 'AFC East', '#002244', '#C60C30'],
+  ['NO', 'New Orleans Saints', 'NFC', 'NFC South', '#D3BC8D', '#101820'],
+  ['NYG', 'New York Giants', 'NFC', 'NFC East', '#0B2265', '#A71930'],
+  ['NYJ', 'New York Jets', 'AFC', 'AFC East', '#125740', '#000000'],
+  ['PHI', 'Philadelphia Eagles', 'NFC', 'NFC East', '#004C54', '#A5ACAF'],
+  ['PIT', 'Pittsburgh Steelers', 'AFC', 'AFC North', '#FFB612', '#101820'],
+  ['SEA', 'Seattle Seahawks', 'NFC', 'NFC West', '#002244', '#69BE28'],
+  ['SF', 'San Francisco 49ers', 'NFC', 'NFC West', '#AA0000', '#B3995D'],
+  ['TB', 'Tampa Bay Buccaneers', 'NFC', 'NFC South', '#D50A0A', '#34302B'],
+  ['TEN', 'Tennessee Titans', 'AFC', 'AFC South', '#0C2340', '#4B92DB'],
+  ['WAS', 'Washington Commanders', 'NFC', 'NFC East', '#5A1414', '#FFB612'],
+].map(([team_abbr, team_name, team_conf, team_division, team_color, team_color2]) => ({
+  team_abbr,
+  team_name,
+  team_conf,
+  team_division,
+  team_color,
+  team_color2,
+}))
