@@ -25,7 +25,7 @@ const PAST_TENSE: Record<Choice, string> = {
  * model is the yardstick held up against it.
  */
 export function OutcomePanels({ play, team, actual, recommended, band, forfeited }: Props) {
-  const accent = team ? accentOnLight(team) : '#1c1917'
+  const accent = team ? accentOnLight(team.team_abbr) : '#1c1917'
   const matched = actual !== null && actual === recommended
   const actualWp = actual === null ? null : actual === 'go' ? play.go_wp : actual === 'fg' ? play.fg_wp : play.punt_wp
   const modelWp = recommended === 'go' ? play.go_wp : recommended === 'fg' ? play.fg_wp : play.punt_wp
@@ -48,7 +48,9 @@ export function OutcomePanels({ play, team, actual, recommended, band, forfeited
         <Panel
           heading="Model"
           headingColor="#57534e"
-          rule="#1c1917"
+          // A neutral rule, so the coloured one is always the team's own half
+          // of the comparison — including for the teams whose colour is black.
+          rule="#a8a29e"
           verdict={CHOICE_VERB[recommended]}
           wp={modelWp}
           note={<BandMeter band={band} />}

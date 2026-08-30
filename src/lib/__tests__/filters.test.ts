@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL, applyFilter, quartersOf, reconcile, weekLabel, weeksOf } from '../filters'
+import { ALL, applyFilter, groupByGame, quartersOf, reconcile, weekLabel, weeksOf } from '../filters'
 import { makePlay } from './fixtures'
 
 const plays = [
@@ -65,5 +65,28 @@ describe('reconcile', () => {
       week: 4,
       qtr: ALL,
     })
+  })
+})
+
+describe('groupByGame', () => {
+  const ordered = [
+    makePlay({ game_id: 'a', week: 1, defteam: 'NYJ' }),
+    makePlay({ game_id: 'a', week: 1, defteam: 'NYJ' }),
+    makePlay({ game_id: 'b', week: 2, defteam: 'SEA' }),
+  ]
+
+  it('collects consecutive plays from the same game', () => {
+    const groups = groupByGame(ordered)
+    expect(groups.map((g) => g.gameId)).toEqual(['a', 'b'])
+    expect(groups[0].plays).toHaveLength(2)
+    expect(groups[0].opponent).toBe('NYJ')
+  })
+
+  it('keeps the order it was given', () => {
+    expect(groupByGame(ordered).map((g) => g.week)).toEqual([1, 2])
+  })
+
+  it('handles an empty list', () => {
+    expect(groupByGame([])).toEqual([])
   })
 })

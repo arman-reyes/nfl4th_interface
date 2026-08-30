@@ -1,7 +1,8 @@
 import type { Play, TeamMeta } from '../../types'
-import { clock, quarterLabel, scoreLine, situationLine } from '../../lib/format'
+import { clock, fieldSpot, quarterLabel, scoreLine, situationLine } from '../../lib/format'
 import { weekLongLabel } from '../../lib/filters'
 import { accentOnLight } from '../../lib/color'
+import { FieldSpotLabel, TeamPill } from '../TeamPill'
 
 interface Props {
   play: Play
@@ -10,11 +11,19 @@ interface Props {
 
 /** The situation, stated the way it would be said out loud. */
 export function SituationHeader({ play, team }: Props) {
-  const accent = team ? accentOnLight(team) : '#1c1917'
+  const accent = team ? accentOnLight(team.team_abbr) : '#1c1917'
   return (
     <header className="border-b border-stone-200 pb-4">
-      <h2 className="text-2xl leading-tight font-bold tracking-tight text-stone-900 sm:text-3xl">
-        {situationLine(play)}
+      <h2
+        className="flex flex-wrap items-center gap-2 text-2xl leading-tight font-bold tracking-tight text-stone-900 sm:text-3xl"
+        aria-label={situationLine(play)}
+      >
+        <span aria-hidden>
+          4th &amp; {play.ydstogo} at
+        </span>
+        <span aria-hidden>
+          <FieldSpotLabel {...fieldSpot(play)} size="md" />
+        </span>
       </h2>
       <dl className="tnum mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-stone-500">
         <Fact label="Clock">
@@ -31,7 +40,9 @@ export function SituationHeader({ play, team }: Props) {
         </Fact>
         <Divider />
         <Fact label="Game">
-          {play.season} {weekLongLabel(play.week)} vs {play.defteam}
+          <span className="inline-flex items-center gap-1.5">
+            {play.season} {weekLongLabel(play.week)} vs <TeamPill abbr={play.defteam} />
+          </span>
         </Fact>
       </dl>
     </header>

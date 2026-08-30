@@ -1,7 +1,7 @@
 import type { Play, TeamMeta } from '../types'
 import type { PlayFilter } from '../lib/filters'
 import { ALL, quarterLabelShort, quartersOf, seasonsOf, weekLabel, weeksOf } from '../lib/filters'
-import { onColor } from '../lib/color'
+import { teamSurface } from '../lib/color'
 
 interface Props {
   plays: Play[]
@@ -99,8 +99,14 @@ interface ChipProps {
 }
 
 function Chip({ team, selected, onClick, children }: ChipProps) {
+  const surface = teamSurface(team.team_abbr)
   const style = selected
-    ? { background: team.team_color, color: onColor(team.team_color), borderColor: team.team_color }
+    ? {
+        background: surface.background,
+        color: surface.color,
+        borderColor: surface.background,
+        boxShadow: `inset 0 -3px 0 ${surface.accent}`,
+      }
     : undefined
   return (
     <button

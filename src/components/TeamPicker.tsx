@@ -36,12 +36,16 @@ export function TeamPicker({ teams, fixture, onSelect }: Props) {
             {teams
               .filter((t) => t.team_conf === conf)
               .map((team) => {
-                const surface = teamSurface(team)
+                const surface = teamSurface(team.team_abbr)
                 return (
                   <li key={team.team_abbr}>
                     <button
                       onClick={() => onSelect(team.team_abbr)}
-                      style={surface}
+                      style={{
+                        background: surface.background,
+                        color: surface.color,
+                        boxShadow: `inset 0 -5px 0 ${surface.accent}`,
+                      }}
                       title={team.team_name}
                       className="flex h-16 w-full flex-col items-center justify-center rounded-md text-base font-bold tracking-wide transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none sm:h-20 sm:text-lg"
                     >

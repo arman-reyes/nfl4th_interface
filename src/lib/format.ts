@@ -39,14 +39,27 @@ export function clock(secondsRemaining: number): string {
 }
 
 /**
- * Field position in the way a broadcast says it: the side of the field plus
- * the yard line. `yardline_100` counts down to the opponent's end zone.
+ * Field position the way a broadcast says it: whose half, and the yard line.
+ * `yardline_100` counts down to the opponent's end zone, so it is the
+ * defence's side below 50 and the offence's above it. Split into parts so the
+ * team abbreviation can be rendered as a coloured pill; `side` is null at
+ * midfield, which belongs to neither.
  */
-export function fieldPosition(play: Play): string {
+export interface FieldSpot {
+  side: string | null
+  yard: number
+}
+
+export function fieldSpot(play: Play): FieldSpot {
   const y = play.yardline_100
-  if (y === 50) return 'the 50'
-  if (y < 50) return `${play.defteam} ${y}`
-  return `${play.posteam} ${100 - y}`
+  if (y === 50) return { side: null, yard: 50 }
+  if (y < 50) return { side: play.defteam, yard: y }
+  return { side: play.posteam, yard: 100 - y }
+}
+
+export function fieldPosition(play: Play): string {
+  const spot = fieldSpot(play)
+  return spot.side === null ? 'the 50' : `${spot.side} ${spot.yard}`
 }
 
 /** "4th & 3 at the KC 38" */

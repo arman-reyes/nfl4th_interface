@@ -97,3 +97,36 @@ export function reconcile(plays: Play[], filter: PlayFilter | null): PlayFilter 
   const qtr = filter && filter.qtr !== ALL && quarters.includes(filter.qtr) ? filter.qtr : ALL
   return { season, week, qtr }
 }
+
+export interface GameGroup {
+  gameId: string
+  week: number
+  opponent: string
+  plays: Play[]
+}
+
+/**
+ * The filtered plays, grouped into the games they came from.
+ *
+ * A flat list repeats the opponent on every row, and the opponent is already
+ * half the situation line whenever the ball is in their half. Grouping states
+ * it once per game and gives a long list something to navigate by.
+ * Input order is preserved, so the groups come out in the order played.
+ */
+export function groupByGame(plays: Play[]): GameGroup[] {
+  const groups: GameGroup[] = []
+  for (const play of plays) {
+    const last = groups.at(-1)
+    if (last && last.gameId === play.game_id) {
+      last.plays.push(play)
+      continue
+    }
+    groups.push({
+      gameId: play.game_id,
+      week: play.week,
+      opponent: play.defteam,
+      plays: [play],
+    })
+  }
+  return groups
+}
