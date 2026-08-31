@@ -94,21 +94,38 @@ Three decisions shape it:
 Hovering a season gives every selected team's value **and its record for that
 year**, since the record is the thing you want beside a tendency.
 
-Beneath it, the same metric plotted against win percentage — one dot per
-team-season, the whole league, selection picked out — with the Pearson
-correlation and n. Over 2014–2025 those correlations are small and worth
-reading carefully:
+Beneath it, the honest version of "does any of this matter".
+
+Win probability points are expected wins by definition — a hundred points is
+one win — so the size of the thing needs no correlation to state:
+
+| | |
+|---|---|
+| Given up per team-season, on average | **0.48 wins** |
+| Worst team-season in the data | **1.00 wins** |
+| Spread across team-seasons | 0.16 wins |
+
+The correlation against actual records is the weaker instrument, and the panel
+shows the arithmetic that says so. Spread in wins given up is 0.16; spread in
+actual wins is 3.6. So even if 4th downs were the only thing separating two
+teams, r could not exceed **±0.045** — against a standard error of 0.051 at
+n = 384. The test cannot resolve an effect this size, and a flat cloud there is
+the predicted result rather than evidence against the model.
+
+Which makes the measured correlations worth reading carefully:
 
 | Metric | r vs win % | |
 |---|---|---|
-| Aggressiveness | −0.16 | slightly negative |
-| Agreement | −0.02 | nothing |
-| Given up, total | +0.16 | an artefact — good teams play playoff games, so they accumulate more total |
-| Given up, per game | +0.03 | nothing, once games are divided out |
+| Aggressiveness | −0.16 | *larger* than decision quality could produce, so it is measuring the reverse — teams that spend a season behind go for it more, and losing teams spend seasons behind |
+| Agreement | −0.02 | inside the noise floor |
+| Given up, per game | +0.03 | inside the noise floor |
+| Given up, total | +0.16 | an artefact — good teams play playoff games and accumulate more total |
 
-The total-versus-per-game pair is why both are offered. None of this is causal:
-a team that spends a season behind goes for it more, so the arrow can point
-either way.
+The total-versus-per-game pair is why both are offered. Two relationships are
+deliberately *not* shown, because they are close to definitional rather than
+findings: agreement against win probability given up (r = −0.69) and
+aggressiveness against it (r = −0.59). Agreeing with the model more mechanically
+means forfeiting less, so plotting it would dress up a tautology as a result.
 
 ## About dialog
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  effectSize,
   medianSeries,
   metricByKey,
   pearson,
@@ -113,5 +114,46 @@ describe('pearson', () => {
 
   it('is null below three points, where it would mean nothing', () => {
     expect(pearson([pair(1, 1), pair(2, 2)])).toBeNull()
+  })
+})
+
+describe('effectSize', () => {
+  const index = {
+    generated_at: '2026-01-01T00:00:00Z',
+    seasons: [2024, 2023],
+    fixture: false,
+    teams: [
+      {
+        team_abbr: 'AAA',
+        team_name: 'A',
+        team_conf: 'AFC',
+        team_division: 'AFC East',
+        team_color: '#000000',
+        team_color2: '#ffffff',
+        summaries: [
+          summary({ season: null, wp_forfeited: 999, wins: 99 }),
+          summary({ season: 2024, wp_forfeited: 40, wins: 12 }),
+          summary({ season: 2023, wp_forfeited: 60, wins: 4 }),
+        ],
+      },
+    ],
+  }
+
+  it('states the cost in wins, a hundred points to one', () => {
+    const effect = effectSize(index)
+    expect(effect.meanWins).toBeCloseTo(0.5, 10)
+    expect(effect.maxWins).toBeCloseTo(0.6, 10)
+  })
+
+  it('ignores the all-seasons row, which would double count', () => {
+    expect(effectSize(index).n).toBe(2)
+  })
+
+  it('reports the ceiling as the ratio of the two spreads', () => {
+    const effect = effectSize(index)
+    // Given up: 0.4 and 0.6, sd 0.1. Wins: 12 and 4, sd 4.
+    expect(effect.sdWins).toBeCloseTo(0.1, 10)
+    expect(effect.sdActualWins).toBeCloseTo(4, 10)
+    expect(effect.ceiling).toBeCloseTo(0.025, 10)
   })
 })

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useElementWidth } from '../../hooks/useElementWidth'
 import { accentOnLight } from '../../lib/color'
 import type { TrendMetric, TrendSeries } from '../../lib/trends'
-import { metricAgainstRecord, pearson, valueExtent } from '../../lib/trends'
+import { metricAgainstRecord, valueExtent } from '../../lib/trends'
 
 interface Props {
   all: TrendSeries[]
@@ -14,32 +14,25 @@ const PAD = { top: 12, right: 14, bottom: 44, left: 40 }
 const HEIGHT = 280
 
 /**
- * Every team-season as one dot: the metric against how the team finished.
+ * Every team-season as one dot: the metric against how the team finished. The
+ * whole league is plotted, with the selection picked out in colour.
  *
- * This is the question the trend lines cannot answer on their own. The whole
- * league is plotted, with the selection picked out in colour, and the
- * correlation is quoted over the league rather than the selection — twelve
- * dots from one team would give a number that moves wildly with the team you
- * happened to click.
- *
- * It is an association and nothing more. Thirty-two teams making their own
- * calls is not an experiment, and the arrow could point the other way, since a
- * team that spends the season behind goes for it more.
+ * The interpretation lives in AgainstRecord, which wraps this. On its own a
+ * flat cloud invites the wrong conclusion, so the plot is never shown without
+ * the arithmetic that says the correlation could not have seen the effect
+ * anyway.
  */
 export function RecordScatter({ all, selected, metric }: Props) {
   const [container, width] = useElementWidth<HTMLDivElement>()
   const league = useMemo(() => metricAgainstRecord(all, metric), [all, metric])
-  const r = useMemo(() => pearson(league), [league])
   const highlighted = useMemo(() => new Set(selected.map((s) => s.abbr)), [selected])
 
   if (metric.key === 'winPct') {
     return (
-      <Frame>
-        <p className="text-sm text-stone-500">
-          Win percentage plotted against itself says nothing. Pick another metric to see how it
-          travels with a team&rsquo;s record.
-        </p>
-      </Frame>
+      <p className="text-sm text-stone-500">
+        Win percentage plotted against itself says nothing. Pick another metric to see how it
+        travels with a team&rsquo;s record.
+      </p>
     )
   }
 
@@ -55,18 +48,8 @@ export function RecordScatter({ all, selected, metric }: Props) {
   )
 
   return (
-    <Frame>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="text-xs font-bold tracking-[0.18em] text-stone-500 uppercase">
-          {metric.label} against record
-        </h3>
-        <p className="tnum text-xs text-stone-500">
-          {r === null ? '—' : `r = ${r.toFixed(2)}`}
-          <span className="text-stone-400"> · n = {league.length} team-seasons, league-wide</span>
-        </p>
-      </div>
-
-      <div ref={container} className="mt-2">
+    <div>
+      <div ref={container}>
         {width > 0 && (
           <svg
             width={width}
@@ -149,19 +132,10 @@ export function RecordScatter({ all, selected, metric }: Props) {
         )}
       </div>
 
-      <p className="mt-1 text-xs leading-relaxed text-stone-500">
-        One dot per team-season, the whole league; selected teams in colour. This is an association,
-        not a cause — 32 teams making their own calls is not an experiment, and the arrow could
-        point the other way, since a team that spends a season behind goes for it more.
+      <p className="mt-1 text-xs leading-relaxed text-stone-400">
+        One dot per team-season, the whole league; selected teams in colour. Association, not cause
+        — a team that spends a season behind goes for it more, so the arrow can point either way.
       </p>
-    </Frame>
-  )
-}
-
-function Frame({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-stone-200 bg-white p-3 shadow-xs sm:p-5">
-      {children}
-    </section>
+    </div>
   )
 }

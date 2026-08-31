@@ -217,3 +217,57 @@ export function pearson(pairs: Pair[]): number | null {
   if (varianceX === 0 || varianceY === 0) return null
   return covariance / Math.sqrt(varianceX * varianceY)
 }
+
+/**
+ * How big the thing being measured actually is, and whether a correlation
+ * against the standings could ever see it.
+ *
+ * Win probability points sum to expected wins by definition — a hundred points
+ * is one win — so the cost of a season of 4th-down calls can be stated in wins
+ * without any correlation at all. The correlation is a far weaker instrument,
+ * and this reports the arithmetic that says so.
+ */
+export interface EffectSize {
+  n: number
+  /** Expected wins given up on 4th down, per team-season. */
+  meanWins: number
+  sdWins: number
+  maxWins: number
+  /** Spread in actual wins, which is what the correlation has to see through. */
+  sdActualWins: number
+  /** The largest r possible if 4th-down cost were the only thing that varied. */
+  ceiling: number
+  /** Standard error of r at this sample size. */
+  standardError: number
+}
+
+/** A hundred win probability points is one expected win. */
+export const POINTS_PER_WIN = 100
+
+export function effectSize(index: LeagueIndex): EffectSize {
+  const rows = index.teams.flatMap((team) =>
+    team.summaries.filter((s) => s.season !== null && s.games > 0),
+  )
+  const givenUp = rows.map((s) => s.wp_forfeited / POINTS_PER_WIN)
+  const actual = rows.map((s) => s.wins)
+
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
+  const sd = (xs: number[]) => {
+    const m = mean(xs)
+    return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length)
+  }
+
+  const n = rows.length
+  const sdWins = sd(givenUp)
+  const sdActualWins = sd(actual)
+
+  return {
+    n,
+    meanWins: mean(givenUp),
+    sdWins,
+    maxWins: Math.max(...givenUp),
+    sdActualWins,
+    ceiling: sdWins / sdActualWins,
+    standardError: 1 / Math.sqrt(Math.max(1, n - 3)),
+  }
+}

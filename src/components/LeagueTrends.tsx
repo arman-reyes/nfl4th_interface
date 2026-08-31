@@ -4,7 +4,7 @@ import type { TrendMetricKey } from '../lib/trends'
 import { buildSeries, metricByKey, TREND_METRICS, trendSeasons } from '../lib/trends'
 import { TrendChart } from './trends/TrendChart'
 import { TeamMultiSelect } from './trends/TeamMultiSelect'
-import { RecordScatter } from './trends/RecordScatter'
+import { AgainstRecord } from './trends/AgainstRecord'
 import { AboutButton } from './AboutButton'
 
 interface Props {
@@ -82,7 +82,7 @@ export function LeagueTrends({ index, onBack, onAbout }: Props) {
         onClear={() => setSelected([])}
       />
 
-      <RecordScatter all={all} selected={chosen} metric={metric} />
+      <AgainstRecord index={index} all={all} selected={chosen} metric={metric} />
     </main>
   )
 }
