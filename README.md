@@ -212,7 +212,7 @@ src/
   lib/color.ts            team colour with contrast checks
   lib/zones.ts            the two axes of the deviation grid
   components/
-    TeamPicker.tsx        all 32 teams, in their own colours
+    TeamPicker.tsx        all 32 teams by division, in their own colours
     TeamBanner.tsx        sticky identity: team, season, plays in scope
     PlayFilters.tsx       season, then week, then quarter
     PlayList.tsx          every 4th down in the filter
@@ -226,7 +226,13 @@ scripts/
 
 ## The drill-down
 
-Team, then season, then week, then quarter, then the individual 4th down. Every
+Team, then season, then week, then quarter, then the individual 4th down.
+
+The landing screen groups the 32 by conference and division, in the order the
+NFL prints them — East, North, South, West — with each division a column of
+four laid out like a standings block. A scout looking for next week's opponent
+knows the division before they know the alphabet, and four columns of four fit a
+phone as two, so nothing scrolls sideways. Every
 level offers only the values the level above actually contains, so no filter can
 lead to an empty screen, and switching teams cannot strand you on a week the new
 team did not play (`reconcile` in `lib/filters.ts`).

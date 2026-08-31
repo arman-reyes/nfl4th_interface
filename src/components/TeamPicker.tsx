@@ -12,6 +12,8 @@ interface Props {
 }
 
 const CONFERENCES = ['AFC', 'NFC'] as const
+/** The order the NFL prints them in, not alphabetical. */
+const DIVISIONS = ['East', 'North', 'South', 'West'] as const
 
 /** Step one of the drill-down: whose 4th downs are we looking at. */
 export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends }: Props) {
@@ -55,34 +57,58 @@ export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends }: Prop
       {CONFERENCES.map((conf) => (
         <section key={conf}>
           <h2 className="text-xs font-bold tracking-[0.18em] text-stone-500 uppercase">{conf}</h2>
-          <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-            {teams
-              .filter((t) => t.team_conf === conf)
-              .map((team) => {
-                const surface = teamSurface(team.team_abbr)
-                return (
-                  <li key={team.team_abbr}>
-                    <button
-                      onClick={() => onSelect(team.team_abbr)}
-                      style={{
-                        background: surface.background,
-                        color: surface.color,
-                        boxShadow: `inset 0 -5px 0 ${surface.accent}`,
-                      }}
-                      title={team.team_name}
-                      className="flex h-16 w-full flex-col items-center justify-center rounded-md text-base font-bold tracking-wide transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none sm:h-20 sm:text-lg"
-                    >
-                      {team.team_abbr}
-                      <span className="mt-0.5 max-w-full truncate px-1 text-[0.625rem] font-medium opacity-95">
-                        {team.team_name.split(' ').at(-1)}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-          </ul>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+            {DIVISIONS.map((division) => (
+              <div key={division}>
+                <h3 className="text-[0.625rem] font-bold tracking-[0.14em] text-stone-400 uppercase">
+                  {division}
+                </h3>
+                <ul className="mt-1.5 space-y-1.5">
+                  {teams
+                    .filter((t) => t.team_division === `${conf} ${division}`)
+                    .map((team) => (
+                      <li key={team.team_abbr}>
+                        <TeamTile team={team} onSelect={onSelect} />
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </section>
       ))}
     </div>
+  )
+}
+
+/**
+ * One team, laid out like a standings row rather than a square: the division
+ * columns are wider than they are tall, so the abbreviation and the nickname
+ * sit on one line.
+ */
+function TeamTile({
+  team,
+  onSelect,
+}: {
+  team: TeamIndexEntry
+  onSelect: (abbr: TeamAbbr) => void
+}) {
+  const surface = teamSurface(team.team_abbr)
+  return (
+    <button
+      onClick={() => onSelect(team.team_abbr)}
+      style={{
+        background: surface.background,
+        color: surface.color,
+        boxShadow: `inset 5px 0 0 ${surface.accent}`,
+      }}
+      title={team.team_name}
+      className="flex w-full items-baseline gap-2 rounded-md py-2 pr-2.5 pl-3.5 text-left transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none"
+    >
+      <span className="text-sm font-bold tracking-wide sm:text-base">{team.team_abbr}</span>
+      <span className="min-w-0 truncate text-[0.6875rem] font-medium opacity-90">
+        {team.team_name.split(' ').at(-1)}
+      </span>
+    </button>
   )
 }
