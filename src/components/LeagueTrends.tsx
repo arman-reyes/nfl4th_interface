@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { LeagueIndex } from '../types'
-import { LEAGUE_METRICS, movement, seasonSpreads } from '../lib/league'
+import { LEAGUE_METRICS, leagueSeasons, movement, seasonSpreads } from '../lib/league'
 import { LeagueTrendPanel } from './trends/LeagueTrendPanel'
-import { AgainstRecord } from './trends/AgainstRecord'
+import { TeamMultiSelect } from './trends/TeamMultiSelect'
 import { AboutButton } from './AboutButton'
 
 interface Props {
@@ -12,20 +12,27 @@ interface Props {
 }
 
 /**
- * The league, not the teams.
+ * Where the league went, and how far apart its teams were while going there.
  *
- * Individual team lines were dropped from this view: thirty-two of them is
- * spaghetti, and one of them out of context says nothing. What is worth seeing
- * here is where the league went, and how far apart its teams are while going
- * there.
+ * The league is always drawn; teams are opt-in. A single team line means
+ * nothing on its own — 38% aggressive is only high or low against what
+ * everyone else was doing that year — so the band and the median stay behind
+ * whatever is selected.
  */
 export function LeagueTrends({ index, onBack, onAbout }: Props) {
-  const seasons = useMemo(() => [...index.seasons].sort((a, b) => a - b), [index])
+  const [selected, setSelected] = useState<string[]>([])
+  // Shared so that hovering one panel moves the guide on all four.
+  const [hover, setHover] = useState<number | null>(null)
 
-  // The headline is the contrast between the first two panels: what the model
-  // asked for barely moved, while what teams did about it roughly doubled.
+  const seasons = useMemo(() => leagueSeasons(index), [index])
   const aggressiveness = useMemo(() => movement(seasonSpreads(index, LEAGUE_METRICS[0])), [index])
   const saidGo = useMemo(() => movement(seasonSpreads(index, LEAGUE_METRICS[1])), [index])
+
+  function toggle(abbr: string) {
+    setSelected((current) =>
+      current.includes(abbr) ? current.filter((a) => a !== abbr) : [...current, abbr],
+    )
+  }
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-3 py-5 sm:px-6 sm:py-8">
@@ -41,12 +48,13 @@ export function LeagueTrends({ index, onBack, onAbout }: Props) {
             League trends
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-stone-500">
-            {seasons[0]}–{seasons.at(-1)}. Each line is the median team; the band behind it is the
-            middle half of the league, which says whether the 32 moved together or came apart.
+            {seasons[0]}–{seasons.at(-1)}. Hover any season to read it off all four panels.
           </p>
         </div>
         <AboutButton onClick={onAbout} tone="muted" />
       </header>
+
+      <Legend />
 
       {aggressiveness && saidGo && (
         <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm leading-relaxed text-stone-600 shadow-xs sm:p-5">
@@ -67,11 +75,65 @@ export function LeagueTrends({ index, onBack, onAbout }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {LEAGUE_METRICS.map((metric) => (
-          <LeagueTrendPanel key={metric.key} index={index} metric={metric} />
+          <LeagueTrendPanel
+            key={metric.key}
+            index={index}
+            metric={metric}
+            selected={selected}
+            hover={hover}
+            onHover={setHover}
+          />
         ))}
       </div>
 
-      <AgainstRecord index={index} />
+      <TeamMultiSelect
+        teams={index.teams}
+        selected={selected}
+        onToggle={toggle}
+        onClear={() => setSelected([])}
+      />
     </main>
+  )
+}
+
+/** What the two marks on every panel mean. */
+function Legend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-stone-200 bg-white px-4 py-3 text-xs text-stone-600 shadow-xs">
+      <span className="flex items-center gap-2">
+        <svg width="26" height="10" aria-hidden className="shrink-0">
+          <line
+            x1="0"
+            y1="5"
+            x2="26"
+            y2="5"
+            stroke="#44403c"
+            strokeWidth="1.75"
+            strokeDasharray="5 3"
+          />
+        </svg>
+        <span>
+          <strong className="font-semibold text-stone-900">Median team</strong> that season
+        </span>
+      </span>
+      <span className="flex items-center gap-2">
+        <svg width="26" height="10" aria-hidden className="shrink-0">
+          <line x1="0" y1="5" x2="26" y2="5" stroke="#0076B6" strokeWidth="2" />
+        </svg>
+        <span>
+          <strong className="font-semibold text-stone-900">A selected team</strong>, in its own
+          colour
+        </span>
+      </span>
+      <span className="flex items-center gap-2">
+        <svg width="26" height="12" aria-hidden className="shrink-0">
+          <rect x="0" y="1" width="26" height="10" fill="#e7e5e4" />
+        </svg>
+        <span>
+          <strong className="font-semibold text-stone-900">Middle half of the league</strong> — the
+          25th to 75th percentile team. A wider band means the 32 were further apart.
+        </span>
+      </span>
+    </div>
   )
 }

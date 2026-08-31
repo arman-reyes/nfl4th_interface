@@ -132,3 +132,75 @@ export function movement(spreads: SeasonSpread[]): Movement | null {
   const last = spreads.at(-1)!
   return { first, last, change: last.p50 - first.p50 }
 }
+
+/** The seasons in the index, oldest first, which is how a trend reads. */
+export function leagueSeasons(index: LeagueIndex): number[] {
+  return [...index.seasons].sort((a, b) => a - b)
+}
+
+export function recordLabel(summary: TeamSummary): string {
+  const base = `${summary.wins}-${summary.losses}`
+  return summary.ties > 0 ? `${base}-${summary.ties}` : base
+}
+
+export interface TeamPoint {
+  season: number
+  /** Null when the team has no data that season, or the metric no denominator. */
+  value: number | null
+  summary: TeamSummary | null
+}
+
+export interface TeamSeries {
+  abbr: string
+  points: TeamPoint[]
+}
+
+/**
+ * One series per named team, with a point for every season on the chart so the
+ * lines align with the league band behind them.
+ */
+export function teamSeries(
+  index: LeagueIndex,
+  metric: LeagueMetric,
+  abbrs: string[],
+  seasons: number[],
+): TeamSeries[] {
+  const wanted = new Set(abbrs)
+  return index.teams
+    .filter((team) => wanted.has(team.team_abbr))
+    .map((team) => {
+      const bySeason = new Map(team.summaries.map((s) => [s.season, s]))
+      return {
+        abbr: team.team_abbr,
+        points: seasons.map((season) => {
+          const summary = bySeason.get(season) ?? null
+          return { season, value: summary ? metric.value(summary) : null, summary }
+        }),
+      }
+    })
+}
+
+/**
+ * The axis range, covering the league band and any selected team lines.
+ *
+ * Selected teams are included because a line that ran off the top of its own
+ * panel would be worse than a slightly looser axis; the band still anchors the
+ * reading.
+ */
+export function chartExtent(
+  spreads: SeasonSpread[],
+  series: TeamSeries[],
+  metric: LeagueMetric,
+): [number, number] {
+  const values = [
+    ...spreads.flatMap((s) => [s.p25, s.p75]),
+    ...series.flatMap((s) => s.points.map((p) => p.value)).filter((v): v is number => v !== null),
+  ]
+  if (values.length === 0) return [0, 1]
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  if (hi === lo) return [lo - 1, hi + 1]
+  const pad = (hi - lo) * 0.12
+  const [floor, ceiling] = metric.clamp ?? [-Infinity, Infinity]
+  return [Math.max(floor, lo - pad), Math.min(ceiling, hi + pad)]
+}

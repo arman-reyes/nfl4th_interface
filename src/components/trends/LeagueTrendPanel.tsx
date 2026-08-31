@@ -1,34 +1,44 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useElementWidth } from '../../hooks/useElementWidth'
+import { accentOnLight } from '../../lib/color'
 import type { LeagueIndex } from '../../types'
 import type { LeagueMetric } from '../../lib/league'
-import { movement, seasonSpreads, spreadExtent } from '../../lib/league'
-import { axisTicks } from './layout'
+import { chartExtent, movement, seasonSpreads, teamSeries } from '../../lib/league'
+import { axisTicks, bandPath, endLabels, linePath } from './layout'
+import { PanelReadout } from './PanelReadout'
+import { Gridlines, SeasonLabels } from './ChartAxis'
 
 interface Props {
   index: LeagueIndex
   metric: LeagueMetric
+  selected: string[]
+  /** Shared across the four panels, so hovering one moves the guide on all. */
+  hover: number | null
+  onHover: (index: number | null) => void
 }
 
-const PAD = { top: 10, right: 8, bottom: 20, left: 38 }
+const PAD = { top: 10, right: 34, bottom: 20, left: 38 }
 const HEIGHT = 168
 
 /**
  * One league metric across the seasons: the median team as a line, the middle
- * half of the league as a band behind it.
+ * half of the league as a band behind it, and a coloured line for each team
+ * the reader has picked out.
  *
  * The band is the half of the story a median hides. It says whether the league
- * moved as a block or came apart, and on aggressiveness it has widened — the
- * gap between the 25th and 75th percentile team is nearly twice what it was in
- * 2014.
+ * moved as a block or came apart, and on aggressiveness it has widened.
  */
-export function LeagueTrendPanel({ index, metric }: Props) {
+export function LeagueTrendPanel({ index, metric, selected, hover, onHover }: Props) {
   const [container, width] = useElementWidth<HTMLDivElement>()
-  const [hover, setHover] = useState<number | null>(null)
 
   const spreads = useMemo(() => seasonSpreads(index, metric), [index, metric])
+  const seasons = useMemo(() => spreads.map((s) => s.season), [spreads])
+  const teams = useMemo(
+    () => teamSeries(index, metric, selected, seasons),
+    [index, metric, selected, seasons],
+  )
   const shift = useMemo(() => movement(spreads), [spreads])
-  const [lo, hi] = spreadExtent(spreads, metric)
+  const [lo, hi] = chartExtent(spreads, teams, metric)
 
   const innerWidth = Math.max(0, width - PAD.left - PAD.right)
   const innerHeight = HEIGHT - PAD.top - PAD.bottom
@@ -36,21 +46,34 @@ export function LeagueTrendPanel({ index, metric }: Props) {
     PAD.left + (spreads.length <= 1 ? innerWidth / 2 : (i / (spreads.length - 1)) * innerWidth)
   const y = (v: number) => PAD.top + innerHeight - ((v - lo) / (hi - lo || 1)) * innerHeight
 
-  const line = spreads.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.p50).toFixed(1)}`).join(' ')
-  const band = [
-    ...spreads.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.p75).toFixed(1)}`),
-    ...[...spreads].reverse().map((s, i) => `L${x(spreads.length - 1 - i).toFixed(1)},${y(s.p25).toFixed(1)}`),
-    'Z',
-  ].join(' ')
+  const median = linePath(
+    spreads.map((s) => s.p50),
+    x,
+    y,
+  )
+  const band = bandPath(
+    spreads.map((s) => s.p75),
+    spreads.map((s) => s.p25),
+    x,
+    y,
+  )
 
-  const active = hover === null ? null : spreads[hover]
+  const labels = endLabels(
+    teams.map((t) => {
+      const last = [...t.points].reverse().find((p) => p.value !== null)
+      return { key: t.abbr, value: last?.value ?? null, x: x(spreads.length - 1) }
+    }),
+    y,
+  )
 
   function onPointer(event: React.PointerEvent<SVGSVGElement>) {
     const box = event.currentTarget.getBoundingClientRect()
     const step = innerWidth / Math.max(1, spreads.length - 1)
-    const index = Math.round((event.clientX - box.left - PAD.left) / step)
-    setHover(index >= 0 && index < spreads.length ? index : null)
+    const i = Math.round((event.clientX - box.left - PAD.left) / step)
+    onHover(i >= 0 && i < spreads.length ? i : null)
   }
+
+  const active = hover === null ? null : (spreads[hover] ?? null)
 
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-3 shadow-xs sm:p-4">
@@ -58,28 +81,18 @@ export function LeagueTrendPanel({ index, metric }: Props) {
         <h3 className="text-xs font-bold tracking-[0.14em] text-stone-500 uppercase">
           {metric.label}
         </h3>
-        {active ? (
+        {shift && (
           <p className="tnum text-xs text-stone-500">
-            <span className="font-bold text-stone-900">{active.season}</span>{' '}
-            <span className="font-semibold text-stone-900">{metric.format(active.p50)}</span>{' '}
-            <span className="text-stone-400">
-              ({metric.format(active.p25)}–{metric.format(active.p75)})
+            {metric.format(shift.first.p50)}
+            <span className="mx-1 text-stone-400">→</span>
+            <span className="text-sm font-bold text-stone-900">
+              {metric.format(shift.last.p50)}
             </span>
           </p>
-        ) : (
-          shift && (
-            <p className="tnum text-xs text-stone-500">
-              {metric.format(shift.first.p50)}
-              <span className="mx-1 text-stone-400">→</span>
-              <span className="text-sm font-bold text-stone-900">
-                {metric.format(shift.last.p50)}
-              </span>
-            </p>
-          )
         )}
       </div>
 
-      <div ref={container} className="mt-2">
+      <div ref={container} className="relative mt-2">
         {width > 0 && (
           <svg
             width={width}
@@ -87,29 +100,10 @@ export function LeagueTrendPanel({ index, metric }: Props) {
             role="img"
             aria-label={`${metric.label}, league median by season`}
             onPointerMove={onPointer}
-            onPointerLeave={() => setHover(null)}
+            onPointerLeave={() => onHover(null)}
             className="touch-pan-y"
           >
-            {axisTicks(lo, hi).map((tick) => (
-              <g key={tick}>
-                <line
-                  x1={PAD.left}
-                  x2={width - PAD.right}
-                  y1={y(tick)}
-                  y2={y(tick)}
-                  stroke="#f0efee"
-                  strokeWidth={1}
-                />
-                <text
-                  x={PAD.left - 6}
-                  y={y(tick) + 3.5}
-                  textAnchor="end"
-                  className="fill-stone-400 text-[9px]"
-                >
-                  {metric.format(tick)}
-                </text>
-              </g>
-            ))}
+            <Gridlines ticks={axisTicks(lo, hi)} y={y} left={PAD.left} right={width - PAD.right} format={metric.format} />
 
             <path d={band} fill="#e7e5e4" />
 
@@ -124,39 +118,63 @@ export function LeagueTrendPanel({ index, metric }: Props) {
               />
             )}
 
+            {/* Dashed, and a shade lighter than ink: it is the reference the
+                team lines are read against, and several team colours resolve
+                to black on white. */}
             <path
-              d={line}
+              d={median}
               fill="none"
-              stroke="#1c1917"
-              strokeWidth={2}
+              stroke="#44403c"
+              strokeWidth={1.75}
+              strokeDasharray="5 3"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
 
-            {spreads.map((s, i) => (
-              <circle
-                key={s.season}
-                cx={x(i)}
-                cy={y(s.p50)}
-                r={hover === i ? 4 : 2}
-                fill="#1c1917"
-              />
-            ))}
+            {teams.map((team) => {
+              const color = accentOnLight(team.abbr)
+              const label = labels.get(team.abbr)
+              return (
+                <g key={team.abbr}>
+                  <path
+                    d={linePath(
+                      team.points.map((p) => p.value),
+                      x,
+                      y,
+                    )}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  {label && (
+                    <text
+                      x={label.x + 5}
+                      y={label.y + 3}
+                      fill={color}
+                      className="text-[9px] font-bold"
+                    >
+                      {team.abbr}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
 
-            {spreads.map((s, i) =>
-              i === 0 || i === spreads.length - 1 || s.season % 2 === 0 ? (
-                <text
-                  key={s.season}
-                  x={x(i)}
-                  y={HEIGHT - 6}
-                  textAnchor="middle"
-                  className={`text-[9px] ${hover === i ? 'fill-stone-900 font-semibold' : 'fill-stone-400'}`}
-                >
-                  {String(s.season).slice(2)}
-                </text>
-              ) : null,
-            )}
+            <SeasonLabels seasons={seasons} x={x} baseline={HEIGHT - 6} hover={hover} />
           </svg>
+        )}
+
+        {active && (
+          <PanelReadout
+            spread={active}
+            teams={teams}
+            index={hover ?? 0}
+            metric={metric}
+            left={x(hover ?? 0)}
+            width={width}
+          />
         )}
       </div>
 

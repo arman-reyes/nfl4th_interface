@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { effectSize, metricAgainstRecord, pairExtent, pearson, recordLabel, winPct } from '../trends'
-import type { Pair } from '../trends'
-import { LEAGUE_METRICS, movement, seasonSpreads, spreadExtent } from '../league'
+import {
+  chartExtent,
+  LEAGUE_METRICS,
+  movement,
+  recordLabel,
+  seasonSpreads,
+  spreadExtent,
+  teamSeries,
+} from '../league'
 import type { LeagueIndex, TeamSummary } from '../../types'
 
 function summary(over: Partial<TeamSummary> = {}): TeamSummary {
@@ -38,17 +44,6 @@ function team(abbr: string, summaries: TeamSummary[]) {
 function index(teams: ReturnType<typeof team>[], seasons = [2024, 2023]): LeagueIndex {
   return { generated_at: '2026-01-01T00:00:00Z', seasons, fixture: false, teams }
 }
-
-describe('winPct', () => {
-  it('counts a tie as half a win, the way the NFL does', () => {
-    expect(winPct(summary({ wins: 10, losses: 7, ties: 0 }))).toBeCloseTo(10 / 17, 10)
-    expect(winPct(summary({ wins: 8, losses: 8, ties: 1 }))).toBeCloseTo(0.5, 10)
-  })
-
-  it('is null when no games were played', () => {
-    expect(winPct(summary({ wins: 0, losses: 0, ties: 0 }))).toBeNull()
-  })
-})
 
 describe('recordLabel', () => {
   it('shows ties only when there were any', () => {
@@ -117,67 +112,50 @@ describe('spreadExtent', () => {
   })
 })
 
-function pair(x: number, y: number): Pair {
-  return { abbr: 'AAA', season: 2024, x, y, record: '10-7' }
-}
-
-describe('pearson', () => {
-  it('is 1 for a perfect rise and -1 for a perfect fall', () => {
-    expect(pearson([pair(1, 1), pair(2, 2), pair(3, 3)])).toBeCloseTo(1, 10)
-    expect(pearson([pair(1, 3), pair(2, 2), pair(3, 1)])).toBeCloseTo(-1, 10)
-  })
-
-  it('is null when a variable never varies, rather than dividing by zero', () => {
-    expect(pearson([pair(1, 5), pair(2, 5), pair(3, 5)])).toBeNull()
-  })
-
-  it('is null below three points, where it would mean nothing', () => {
-    expect(pearson([pair(1, 1), pair(2, 2)])).toBeNull()
-  })
-})
-
-describe('metricAgainstRecord', () => {
-  it('leaves out the all-seasons row, which would double count', () => {
-    const one = index([team('A', [summary({ season: null }), summary({ season: 2024 })])])
-    expect(metricAgainstRecord(one, AGGRESSIVENESS)).toHaveLength(1)
-  })
-
-  it('carries the record for the tooltip', () => {
-    const one = index([team('A', [summary({ season: 2024, wins: 12, losses: 5 })])])
-    expect(metricAgainstRecord(one, AGGRESSIVENESS)[0].record).toBe('12-5')
-  })
-})
-
-describe('pairExtent', () => {
-  it('gives a usable range when every value is identical', () => {
-    const [lo, hi] = pairExtent([pair(0.3, 0.5), pair(0.3, 0.6)], AGGRESSIVENESS)
-    expect(hi).toBeGreaterThan(lo)
-  })
-})
-
-describe('effectSize', () => {
+describe('teamSeries', () => {
   const two = index([
-    team('A', [
-      summary({ season: null, wp_forfeited: 999, wins: 99 }),
-      summary({ season: 2024, wp_forfeited: 40, wins: 12 }),
-      summary({ season: 2023, wp_forfeited: 60, wins: 4 }),
-    ]),
+    team('A', [summary({ season: 2023, aggressiveness: 0.2 }), summary({ season: 2024, aggressiveness: 0.5 })]),
+    team('B', [summary({ season: 2024, aggressiveness: 0.9 })]),
   ])
 
-  it('states the cost in wins, a hundred points to one', () => {
-    expect(effectSize(two).meanWins).toBeCloseTo(0.5, 10)
-    expect(effectSize(two).maxWins).toBeCloseTo(0.6, 10)
+  it('returns only the teams asked for', () => {
+    expect(teamSeries(two, AGGRESSIVENESS, ['B'], [2023, 2024]).map((s) => s.abbr)).toEqual(['B'])
   })
 
-  it('ignores the all-seasons row', () => {
-    expect(effectSize(two).n).toBe(2)
+  it('has a point for every season on the chart, so lines align with the band', () => {
+    const [b] = teamSeries(two, AGGRESSIVENESS, ['B'], [2023, 2024])
+    expect(b.points.map((p) => p.season)).toEqual([2023, 2024])
+    expect(b.points[0].value).toBeNull()
+    expect(b.points[1].value).toBeCloseTo(0.9, 10)
   })
 
-  it('reports the ceiling as the ratio of the two spreads', () => {
-    const effect = effectSize(two)
-    // Given up: 0.4 and 0.6, sd 0.1. Wins: 12 and 4, sd 4.
-    expect(effect.sdWins).toBeCloseTo(0.1, 10)
-    expect(effect.sdActualWins).toBeCloseTo(4, 10)
-    expect(effect.ceiling).toBeCloseTo(0.025, 10)
+  it('carries the summary so a readout can show the record', () => {
+    const [a] = teamSeries(two, AGGRESSIVENESS, ['A'], [2024])
+    expect(a.points[0].summary?.wins).toBe(10)
+  })
+
+  it('returns nothing when no team is selected', () => {
+    expect(teamSeries(two, AGGRESSIVENESS, [], [2024])).toEqual([])
+  })
+})
+
+describe('chartExtent', () => {
+  const spreads = [{ season: 2024, p25: 0.3, p50: 0.35, p75: 0.4, n: 32 }]
+
+  it('covers the band when nothing is selected', () => {
+    const [lo, hi] = chartExtent(spreads, [], AGGRESSIVENESS)
+    expect(lo).toBeLessThan(0.3)
+    expect(hi).toBeGreaterThan(0.4)
+  })
+
+  it('stretches to hold a selected line that runs outside the band', () => {
+    const outlier = [{ abbr: 'A', points: [{ season: 2024, value: 0.8, summary: null }] }]
+    const [, hi] = chartExtent(spreads, outlier, AGGRESSIVENESS)
+    expect(hi).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it('still respects the metric bounds', () => {
+    const outlier = [{ abbr: 'A', points: [{ season: 2024, value: 1, summary: null }] }]
+    expect(chartExtent(spreads, outlier, AGGRESSIVENESS)[1]).toBe(1)
   })
 })

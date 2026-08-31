@@ -70,17 +70,28 @@ numbers can never be mistaken for real ones.
 
 ## League trends
 
-A second view, reached from the header on either screen. Four league metrics
-across 2014–2025: each line is the median team, and the band behind it is the
-middle half of the league.
+A second view, reached from the header on either screen. Four metrics across
+2014–2025, drawn as small multiples.
 
-Individual team lines were tried and dropped. Thirty-two of them is spaghetti,
-and one of them out of context says nothing — what is worth seeing here is where
-the league went, and how far apart its teams were while going there. The band is
-the half of the story a median hides: on aggressiveness it has widened, so the
-league did not move as a block.
+Every panel carries two marks, both spelled out in a legend on the page:
 
-It reads `index.json` alone, so the whole view is one small request.
+- a **dashed line** — the **median team** that season;
+- a **grey band** — the **middle half of the league**, the 25th to 75th
+  percentile team. A wider band means the 32 were further apart.
+
+The band is the half of the story a median hides. On aggressiveness it has
+widened from about 8 points of spread in 2014 to 14 in 2025: the league did not
+move as a block, and early adopters pulled away from the teams that did not
+move.
+
+Teams are opt-in. Picking any adds a solid line in its own colour to **all four**
+panels at once, with the abbreviation printed at the line's end — colour alone
+cannot separate two lines, since ten of the 32 team colours resolve to near-black
+on white. Hovering a season puts a guide on all four panels and reads out the
+league median, its quartiles, and each selected team's value with that team's
+record for the year.
+
+The whole view reads `index.json` alone, so it is one small request.
 
 ### What it shows
 
@@ -97,37 +108,28 @@ going was optimal is a property of the situations teams faced, not of what they
 did about them. What changed is what teams did with it, and the cost per game
 nearly halved.
 
-### Does it show up in the standings?
+### Why there is no "does it correlate with winning" panel
+
+One was built and then removed, because the question it answers is not one this
+data can answer.
 
 Win probability points are expected wins by definition — a hundred points is one
-win — so the size of the thing needs no correlation to state:
+win — so the size of the effect is already stated: teams give up **0.48 wins a
+season** on average, and the worst team-season in the data gave up **1.00**.
 
-| | |
-|---|---|
-| Given up per team-season, on average | **0.48 wins** |
-| Worst team-season in the data | **1.00 wins** |
-| Spread across team-seasons | 0.16 wins |
+A correlation against actual records is a far weaker instrument. Spread in wins
+given up is 0.16; spread in actual wins is 3.6. So even if 4th downs were the
+only thing separating two teams, r could not exceed **±0.045** — against a
+standard error of 0.051 at n = 384. The test cannot resolve an effect this size,
+and the measured correlations bear that out: agreement −0.02, win probability
+given up per game +0.03, both inside the noise floor. Aggressiveness comes in at
+−0.16, which is *larger* than decision quality could produce and therefore
+measures the reverse: teams that spend a season behind go for it more, and losing
+teams spend seasons behind.
 
-The correlation against actual records is a far weaker instrument, and the panel
-shows the arithmetic that says so. Spread in wins given up is 0.16; spread in
-actual wins is 3.6. So even if 4th downs were the only thing separating two
-teams, r could not exceed **±0.045** — against a standard error of 0.051 at
-n = 384. The test cannot resolve an effect this size, and a flat cloud there is
-the predicted result rather than evidence against the model.
-
-Which makes the measured correlations worth reading carefully:
-
-| Metric vs win % | r | |
-|---|---|---|
-| Win probability given up, per game | +0.03 | inside the noise floor |
-| Agreement | −0.02 | inside the noise floor |
-| Aggressiveness | −0.16 | *larger* than decision quality could produce, so it is measuring the reverse — teams that spend a season behind go for it more, and losing teams spend seasons behind |
-
-Two relationships are deliberately **not** shown, because they are close to
-definitional rather than findings: agreement against win probability given up
-(r = −0.69) and aggressiveness against it (r = −0.59). Agreeing with the model
-more mechanically means forfeiting less, so plotting it would dress a tautology
-up as a result.
+Showing a flat scatter invited the conclusion that none of it matters, which is
+the opposite of what the arithmetic says. The per-decision numbers are the
+product; a 17-game record is the wrong instrument for reading them.
 
 ## About dialog
 
