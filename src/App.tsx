@@ -11,6 +11,7 @@ import { PlayList } from './components/PlayList'
 import { TeamBanner } from './components/TeamBanner'
 import { TeamPicker } from './components/TeamPicker'
 import { TeamSummary } from './components/TeamSummary'
+import { AboutDialog } from './components/AboutDialog'
 
 /**
  * The drill-down: team, season, week, quarter, then the individual 4th down.
@@ -31,6 +32,7 @@ export default function App() {
   // team's data has arrived.
   const [intent, setIntent] = useState<PlayFilter | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const team = useTeamData(abbr)
 
   const meta = index.data?.teams.find((t) => t.team_abbr === abbr)
@@ -77,7 +79,13 @@ export default function App() {
   if (!abbr || !meta) {
     return (
       <main className="mx-auto max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
-        <TeamPicker teams={index.data.teams} fixture={index.data.fixture} onSelect={chooseTeam} />
+        <TeamPicker
+          teams={index.data.teams}
+          fixture={index.data.fixture}
+          onSelect={chooseTeam}
+          onAbout={() => setAboutOpen(true)}
+        />
+        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
       </main>
     )
   }
@@ -94,7 +102,10 @@ export default function App() {
         season={filter?.season ?? index.data.seasons[0]}
         plays={seasonCount}
         onChangeTeam={() => setAbbr(null)}
+        onAbout={() => setAboutOpen(true)}
       />
+
+      <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
 
       <main className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0">
         {team.loading && <Centered>Loading {abbr}…</Centered>}

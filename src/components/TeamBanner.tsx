@@ -1,15 +1,17 @@
 import type { TeamIndexEntry } from '../types'
 import { teamSurface } from '../lib/color'
+import { AboutButton } from './AboutButton'
 
 interface Props {
   team: TeamIndexEntry
   season: number
   plays: number
   onChangeTeam: () => void
+  onAbout: () => void
 }
 
 /** Sticky identity: which team, which season, how many 4th downs in scope. */
-export function TeamBanner({ team, season, plays, onChangeTeam }: Props) {
+export function TeamBanner({ team, season, plays, onChangeTeam, onAbout }: Props) {
   const surface = teamSurface(team.team_abbr)
   return (
     <div className="sticky top-0 z-20 shadow-sm">
@@ -30,6 +32,7 @@ export function TeamBanner({ team, season, plays, onChangeTeam }: Props) {
         >
           Change
         </button>
+        <AboutButton onClick={onAbout} />
       </div>
       {/* The secondary colour, so teams with a near-black primary still read
           as themselves rather than as generic chrome. */}

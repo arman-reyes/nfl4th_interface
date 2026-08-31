@@ -48,6 +48,7 @@ export function summarize(plays: Play[], season: number | null): TeamSummary {
   return {
     season,
     games,
+    plays: scoped.length,
     decisions,
     go_recommended: goRecommended,
     go_taken: goTaken,

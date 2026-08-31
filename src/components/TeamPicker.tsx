@@ -1,23 +1,28 @@
 import type { TeamIndexEntry, TeamAbbr } from '../types'
 import { teamSurface } from '../lib/color'
+import { AboutButton } from './AboutButton'
 
 interface Props {
   teams: TeamIndexEntry[]
   /** True when the loaded data is generated fixtures rather than model output. */
   fixture: boolean
   onSelect: (abbr: TeamAbbr) => void
+  onAbout: () => void
 }
 
 const CONFERENCES = ['AFC', 'NFC'] as const
 
 /** Step one of the drill-down: whose 4th downs are we looking at. */
-export function TeamPicker({ teams, fixture, onSelect }: Props) {
+export function TeamPicker({ teams, fixture, onSelect, onAbout }: Props) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-          4th Down Review
-        </h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+            4th Down Review
+          </h1>
+          <AboutButton onClick={onAbout} tone="muted" />
+        </div>
         <p className="mt-1 text-sm text-stone-500">
           Pick a team to review every 4th down they faced, and what the model would have done.
         </p>

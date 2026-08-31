@@ -92,6 +92,8 @@ export interface TeamMeta {
 export interface TeamSummary {
   season: number | null
   games: number
+  /** Every 4th down in scope, including those carrying no decision. */
+  plays: number
   /** 4th downs whose play_type maps to a decision. */
   decisions: number
   /** Of those, how many the model wanted the offense to go for. */

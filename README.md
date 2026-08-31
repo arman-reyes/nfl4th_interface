@@ -57,6 +57,14 @@ consistency. Every file it writes is overwritten by the R pipeline. The index it
 produces is stamped `"fixture": true`, which the app surfaces in the UI, so fixture
 numbers can never be mistaken for real ones.
 
+## About dialog
+
+The question-mark button, top right on both the picker and the team banner,
+opens the methodology: what nfl4th is and what sits behind it, where the data
+came from, every derived quantity defined, and how to read the result. It is
+built from `index.json`, so the corpus size and build date it quotes describe
+the data actually loaded rather than a number written into the prose.
+
 ## Definitions
 
 Every number in the interface traces to a field in the data or to one of these:
@@ -69,6 +77,7 @@ Every number in the interface traces to a field in the data or to one of these:
 | Aggressiveness | Of the 4th downs where the model recommended going, the share the staff actually went for. |
 | Agreement rate | Share of all classifiable 4th downs where the actual choice matched the model's top option. |
 | WP forfeited | Per play, (best option's WP − chosen option's WP) in percentage points; summed, and divided by games. |
+| Go expected value | `go_wp` is exactly `first_down_prob × wp_succeed + (1 − first_down_prob) × wp_fail`. Verified against all 25,093 plays: the identity holds to the last decimal place on every one, which is why the card draws it as two weighted branches. |
 | Impact tier | The forfeited points banded on the same 1-and-3 scale as the strength band: *minor*, *notable*, *costly*. |
 | Game state | How live the game was, from the win probability carried by the model's own recommendation: *in doubt* inside 35–65%, *leaning* to 15/85, *lopsided* to 5/95, *decided* beyond it. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
