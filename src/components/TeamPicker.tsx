@@ -38,7 +38,7 @@ export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends, onQuiz
         <p className="mt-1 text-sm text-stone-500">
           Pick a team to review every 4th down they faced, and what the models from{' '}
           <a
-            href="https://nfl4th.com"
+            href="https://www.nfl4th.com/"
             target="_blank"
             rel="noreferrer"
             className="font-medium text-stone-700 underline decoration-stone-400 underline-offset-2 transition-colors hover:text-stone-900"
