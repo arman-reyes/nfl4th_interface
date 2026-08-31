@@ -28,3 +28,5 @@ public/data/
 
 # Local Python venv, only used while probing the data sources
 .venv/
+
+deploymentREADME.md

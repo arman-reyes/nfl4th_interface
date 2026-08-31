@@ -1,6 +1,6 @@
 import type { Play, TeamMeta } from '../types'
 import type { PlayFilter } from '../lib/filters'
-import { ALL, quarterLabelShort, quartersOf, seasonsOf, weekLabel, weeksOf } from '../lib/filters'
+import { ALL, quarterLabelShort, quartersOf, weekLabel, weeksOf } from '../lib/filters'
 import { teamSurface } from '../lib/color'
 
 interface Props {
@@ -11,30 +11,16 @@ interface Props {
 }
 
 /**
- * Season, then week, then quarter. Each row offers only what the row above
- * contains, and the rows scroll sideways on a phone rather than wrapping into
- * a wall of chips.
+ * Week, then quarter, within the season the banner is holding. Each row offers
+ * only what the level above it contains, so no combination lands on an empty
+ * list.
  */
 export function PlayFilters({ plays, team, filter, onChange }: Props) {
-  const seasons = seasonsOf(plays)
   const weeks = weeksOf(plays, filter.season)
   const quarters = quartersOf(plays, filter.season, filter.week)
 
   return (
     <div className="space-y-2.5">
-      <Row label="Season">
-        {seasons.map((season) => (
-          <Chip
-            key={season}
-            team={team}
-            selected={season === filter.season}
-            onClick={() => onChange({ season, week: ALL, qtr: ALL })}
-          >
-            {String(season)}
-          </Chip>
-        ))}
-      </Row>
-
       <Row label="Week">
         <Chip
           team={team}

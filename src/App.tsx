@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLeagueIndex, useTeamData } from './hooks/useTeamData'
-import { ALL, applyFilter, playKey, reconcile } from './lib/filters'
+import { ALL, applyFilter, playKey, reconcile, seasonsOf } from './lib/filters'
 import type { PlayFilter } from './lib/filters'
 import { playsInSeason } from './lib/metrics'
 import type { GameSummary } from './lib/games'
@@ -52,6 +52,12 @@ export default function App() {
     [plays, filter],
   )
   const selected = visible.find((p) => playKey(p) === selectedKey) ?? null
+  // The banner's season list. Until the team's plays arrive it is the league's
+  // seasons, so the picker is never empty while a team is loading.
+  const seasons = useMemo(
+    () => (plays ? seasonsOf(plays) : (index.data?.seasons ?? [])),
+    [plays, index.data],
+  )
 
   function chooseTeam(next: TeamAbbr) {
     setAbbr(next)
@@ -61,6 +67,11 @@ export default function App() {
   function changeFilter(next: PlayFilter) {
     setIntent(next)
     setSelectedKey(null)
+  }
+
+  /** A new season resets the week and quarter beneath it. */
+  function changeSeason(season: number) {
+    changeFilter({ season, week: ALL, qtr: ALL })
   }
 
   /** Tapping the open row again closes it, back to the summary. */
@@ -132,7 +143,9 @@ export default function App() {
       <TeamBanner
         team={meta}
         season={filter?.season ?? index.data.seasons[0]}
+        seasons={seasons}
         plays={seasonCount}
+        onChangeSeason={changeSeason}
         onChangeTeam={() => setAbbr(null)}
         onAbout={() => setAboutOpen(true)}
         onTrends={() => setShowTrends(true)}
