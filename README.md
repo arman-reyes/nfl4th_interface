@@ -1,4 +1,4 @@
-# 4th Down Review
+# 4th Down Stats
 
 A coach-facing interface over the [`nfl4th`](https://www.nfl4th.com/) win-probability
 model. It answers two questions for any of the 32 NFL teams: what does the model say

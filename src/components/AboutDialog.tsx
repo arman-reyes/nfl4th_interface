@@ -44,10 +44,7 @@ export function AboutDialog({ open, index, onClose }: Props) {
     >
       <div className="sticky top-0 flex items-baseline justify-between gap-4 border-b border-stone-200 bg-white px-5 py-4 sm:px-7">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">About this tool</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            Methodology, and what the model underneath it is
-          </p>
+          <h2 className="text-xl font-bold tracking-tight text-stone-900">About</h2>
         </div>
         <button
           onClick={onClose}
@@ -58,11 +55,11 @@ export function AboutDialog({ open, index, onClose }: Props) {
       </div>
 
       <div className="space-y-7 px-5 py-6 sm:px-7">
-        <Section title="What this is">
+        <Section title="What is this?">
           <P>
-            An interface over the <Strong>nfl4th</Strong> win-probability model. The model is not
+            A tool to help interpret the <Strong>nfl4th</Strong> win-probability model. The model is not
             part of this app, and nothing here fits, retrains or approximates it. nfl4th produces
-            the estimates; this app makes them legible for two questions — what does the model say a
+            the win probabilities; the 4th down stats app contextualizes them — what does the model say a
             staff should do on 4th down, and what do they actually do.
           </P>
         </Section>
@@ -143,12 +140,7 @@ export function AboutDialog({ open, index, onClose }: Props) {
             exceed 4.2, and none of the calls costing more than five points happened in one. They
             still count against the agreement rate — the interface greys them out and says why,
             rather than quietly excluding them.
-          </P>
-          <P>
-            <Strong>Decisions are attributed to a team and a season</Strong>, never to a named
-            coach. A staff is not one person, and the play-by-play record does not say who made the
-            call.
-          </P>
+          </P>          
         </Section>
 
         <Section title="What is deliberately absent">

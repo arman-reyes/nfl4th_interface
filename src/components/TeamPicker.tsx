@@ -19,12 +19,21 @@ export function TeamPicker({ teams, fixture, onSelect, onAbout }: Props) {
       <div>
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            4th Down Review
+            4th Down Stats
           </h1>
           <AboutButton onClick={onAbout} tone="muted" />
         </div>
         <p className="mt-1 text-sm text-stone-500">
-          Pick a team to review every 4th down they faced, and what the model would have done.
+          Pick a team to review every 4th down they faced, and what the models from{' '}
+          <a
+            href="https://nfl4th.com"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-stone-700 underline decoration-stone-400 underline-offset-2 transition-colors hover:text-stone-900"
+          >
+            nfl4th
+          </a>{' '}
+          would have done.
         </p>
         {fixture && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200 ring-inset">
