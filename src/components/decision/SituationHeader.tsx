@@ -38,6 +38,11 @@ export function SituationHeader({ play, team }: Props) {
         <Divider />
         <Fact label="Score">{scoreLine(play.score_differential)}</Fact>
         <Divider />
+        {/* The headline states field position the way a broadcast does, which
+            needs you to know whose half it is. This is the same thing as the
+            model sees it: distance to the end zone. */}
+        <Fact label="Field position">{play.yardline_100} yds to goal</Fact>
+        <Divider />
         <Fact label="Timeouts">
           TO {play.posteam_timeouts_remaining}–{play.defteam_timeouts_remaining}
         </Fact>
