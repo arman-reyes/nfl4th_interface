@@ -12,6 +12,7 @@ import { TeamBanner } from './components/TeamBanner'
 import { TeamPicker } from './components/TeamPicker'
 import { TeamSummary } from './components/TeamSummary'
 import { AboutDialog } from './components/AboutDialog'
+import { LeagueTrends } from './components/LeagueTrends'
 
 /**
  * The drill-down: team, season, week, quarter, then the individual 4th down.
@@ -33,6 +34,7 @@ export default function App() {
   const [intent, setIntent] = useState<PlayFilter | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [showTrends, setShowTrends] = useState(false)
   const team = useTeamData(abbr)
 
   const meta = index.data?.teams.find((t) => t.team_abbr === abbr)
@@ -76,6 +78,19 @@ export default function App() {
   if (index.error) return <Centered tone="error">{index.error.message}</Centered>
   if (!index.data) return null
 
+  if (showTrends) {
+    return (
+      <>
+        <LeagueTrends
+          index={index.data}
+          onBack={() => setShowTrends(false)}
+          onAbout={() => setAboutOpen(true)}
+        />
+        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+      </>
+    )
+  }
+
   if (!abbr || !meta) {
     return (
       <main className="mx-auto max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
@@ -84,6 +99,7 @@ export default function App() {
           fixture={index.data.fixture}
           onSelect={chooseTeam}
           onAbout={() => setAboutOpen(true)}
+          onTrends={() => setShowTrends(true)}
         />
         <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
       </main>
@@ -103,6 +119,7 @@ export default function App() {
         plays={seasonCount}
         onChangeTeam={() => setAbbr(null)}
         onAbout={() => setAboutOpen(true)}
+        onTrends={() => setShowTrends(true)}
       />
 
       <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />

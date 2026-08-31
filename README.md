@@ -68,6 +68,48 @@ consistency. Every file it writes is overwritten by the R pipeline. The index it
 produces is stamped `"fixture": true`, which the app surfaces in the UI, so fixture
 numbers can never be mistaken for real ones.
 
+## League trends
+
+A second view, reached from the header on either screen. One line per team per
+season, for aggressiveness, agreement, win probability given up (total and per
+game), or win percentage.
+
+It reads `index.json` alone — the per-season summaries are already precomputed
+there — so it is one small request no matter how many teams are on the chart,
+and no team file is fetched at all.
+
+Three decisions shape it:
+
+- **All 32 teams are always drawn, faintly, with the league median dashed.** A
+  single line means nothing on its own. League aggressiveness went from 24.6% in
+  2014 to 47.4% in 2025, so "38%" is only high or low relative to what everyone
+  else was doing that year.
+- **The axis is fitted across all 32, never the selection.** An axis that
+  rescaled when a team was toggled would make two selections incomparable and
+  would slide the context lines underneath them.
+- **Lines are labelled at their right end.** Ten of the 32 team colours resolve
+  to near-black on white, so colour alone cannot separate two selected lines.
+  Labels are nudged apart where lines finish together.
+
+Hovering a season gives every selected team's value **and its record for that
+year**, since the record is the thing you want beside a tendency.
+
+Beneath it, the same metric plotted against win percentage — one dot per
+team-season, the whole league, selection picked out — with the Pearson
+correlation and n. Over 2014–2025 those correlations are small and worth
+reading carefully:
+
+| Metric | r vs win % | |
+|---|---|---|
+| Aggressiveness | −0.16 | slightly negative |
+| Agreement | −0.02 | nothing |
+| Given up, total | +0.16 | an artefact — good teams play playoff games, so they accumulate more total |
+| Given up, per game | +0.03 | nothing, once games are divided out |
+
+The total-versus-per-game pair is why both are offered. None of this is causal:
+a team that spends a season behind goes for it more, so the arrow can point
+either way.
+
 ## About dialog
 
 The question-mark button, top right on both the picker and the team banner,

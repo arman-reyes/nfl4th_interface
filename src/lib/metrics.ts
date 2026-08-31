@@ -1,5 +1,6 @@
 import type { Band, Choice, Play, TeamSummary } from '../types'
 import { actualChoice, agreed, modelChoice, wpForfeited } from './decision'
+import { gameResult } from './filters'
 import { BANDS, FIELD_ZONES, fieldZone, playBand } from './zones'
 import type { FieldZone } from './zones'
 
@@ -27,6 +28,22 @@ export function summarize(plays: Play[], season: number | null): TeamSummary {
   const scoped = playsInSeason(plays, season)
   const games = new Set(scoped.map((p) => p.game_id)).size
 
+  // One result per game, not per play. A team file holds several 4th downs
+  // from the same game and every one of them carries that game's final score.
+  const results = new Map<string, ReturnType<typeof gameResult>>()
+  for (const play of scoped) {
+    if (!results.has(play.game_id)) results.set(play.game_id, gameResult(play))
+  }
+  let wins = 0
+  let losses = 0
+  let ties = 0
+  for (const result of results.values()) {
+    if (result === null) continue
+    if (result.outcome === 'W') wins += 1
+    else if (result.outcome === 'L') losses += 1
+    else ties += 1
+  }
+
   let decisions = 0
   let matched = 0
   let goRecommended = 0
@@ -49,6 +66,9 @@ export function summarize(plays: Play[], season: number | null): TeamSummary {
     season,
     games,
     plays: scoped.length,
+    wins,
+    losses,
+    ties,
     decisions,
     go_recommended: goRecommended,
     go_taken: goTaken,

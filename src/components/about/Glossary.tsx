@@ -91,6 +91,27 @@ const ENTRIES: Entry[] = [
     ),
   },
   {
+    term: 'Win percentage',
+    body: (
+      <>
+        <Code>(wins + 0.5 × ties) / games</Code>, the way the NFL counts it. Records cover every
+        game in the data, postseason included, so a deep run raises both the games played and the
+        wins.
+      </>
+    ),
+  },
+  {
+    term: 'Correlation (r)',
+    body: (
+      <>
+        On the league trends page, the Pearson correlation between a metric and win percentage
+        across every team-season, quoted with n beside it. It is an association and nothing more:
+        32 teams making their own calls is not an experiment, and the arrow can point the other way
+        — a team that spends a season behind goes for it more.
+      </>
+    ),
+  },
+  {
     term: 'Game result',
     body: (
       <>

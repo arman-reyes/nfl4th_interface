@@ -8,12 +8,13 @@ interface Props {
   fixture: boolean
   onSelect: (abbr: TeamAbbr) => void
   onAbout: () => void
+  onTrends: () => void
 }
 
 const CONFERENCES = ['AFC', 'NFC'] as const
 
 /** Step one of the drill-down: whose 4th downs are we looking at. */
-export function TeamPicker({ teams, fixture, onSelect, onAbout }: Props) {
+export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends }: Props) {
   return (
     <div className="space-y-8">
       <div>
@@ -21,7 +22,15 @@ export function TeamPicker({ teams, fixture, onSelect, onAbout }: Props) {
           <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
             4th Down Stats
           </h1>
-          <AboutButton onClick={onAbout} tone="muted" />
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={onTrends}
+              className="rounded border border-stone-300 px-2.5 py-1 text-xs font-semibold tracking-wide text-stone-600 uppercase hover:border-stone-500 hover:text-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none"
+            >
+              League trends
+            </button>
+            <AboutButton onClick={onAbout} tone="muted" />
+          </div>
         </div>
         <p className="mt-1 text-sm text-stone-500">
           Pick a team to review every 4th down they faced, and what the models from{' '}

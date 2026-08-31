@@ -8,10 +8,11 @@ interface Props {
   plays: number
   onChangeTeam: () => void
   onAbout: () => void
+  onTrends: () => void
 }
 
 /** Sticky identity: which team, which season, how many 4th downs in scope. */
-export function TeamBanner({ team, season, plays, onChangeTeam, onAbout }: Props) {
+export function TeamBanner({ team, season, plays, onChangeTeam, onAbout, onTrends }: Props) {
   const surface = teamSurface(team.team_abbr)
   return (
     <div className="sticky top-0 z-20 shadow-sm">
@@ -25,6 +26,13 @@ export function TeamBanner({ team, season, plays, onChangeTeam, onAbout }: Props
           {season}
           <span className="opacity-70"> · {plays} fourth downs</span>
         </span>
+        <button
+          onClick={onTrends}
+          style={{ borderColor: surface.color }}
+          className="hidden shrink-0 rounded border px-2.5 py-1 text-xs font-semibold tracking-wide uppercase opacity-90 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:outline-none sm:block"
+        >
+          Trends
+        </button>
         <button
           onClick={onChangeTeam}
           style={{ borderColor: surface.color }}

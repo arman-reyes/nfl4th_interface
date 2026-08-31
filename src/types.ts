@@ -94,6 +94,10 @@ export interface TeamSummary {
   games: number
   /** Every 4th down in scope, including those carrying no decision. */
   plays: number
+  /** The team's record over the scope, from games with a recorded result. */
+  wins: number
+  losses: number
+  ties: number
   /** 4th downs whose play_type maps to a decision. */
   decisions: number
   /** Of those, how many the model wanted the offense to go for. */
