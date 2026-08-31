@@ -21,33 +21,42 @@ export function playKey(play: Play): string {
 }
 
 /**
- * nflverse numbers the postseason straight on from the regular season. Coaches
- * do not call it week 21.
+ * nflverse numbers the postseason straight on from the regular season, and
+ * coaches do not call it week 21.
+ *
+ * Where the postseason starts depends on the season: the regular season grew
+ * from 17 weeks to 18 in 2021, moving the playoffs with it. Wild Card is week
+ * 18 through 2020 and week 19 from 2021 on, so the round cannot be read from
+ * the week number alone.
  */
-const POSTSEASON: Record<number, string> = {
-  19: 'WC',
-  20: 'DIV',
-  21: 'CONF',
-  22: 'SB',
+const ROUNDS_SHORT = ['WC', 'DIV', 'CONF', 'SB'] as const
+const ROUNDS_LONG = ['Wild Card', 'Divisional', 'Conference', 'Super Bowl'] as const
+
+function firstPostseasonWeek(season: number): number {
+  return season >= 2021 ? 19 : 18
 }
 
-export function weekLabel(week: number): string {
-  return POSTSEASON[week] ?? String(week)
+/** The playoff round for a week, or null if it is a regular-season week. */
+export function postseasonRound(season: number, week: number): number | null {
+  const round = week - firstPostseasonWeek(season)
+  return round >= 0 && round < ROUNDS_SHORT.length ? round : null
 }
 
-/** "Wk 7" in the regular season, "WC" / "DIV" / "CONF" / "SB" after it. */
-export function weekShortLabel(week: number): string {
-  return POSTSEASON[week] ?? `Wk ${week}`
+/** "7" in the regular season, "WC" / "DIV" / "CONF" / "SB" after it. */
+export function weekLabel(season: number, week: number): string {
+  const round = postseasonRound(season, week)
+  return round === null ? String(week) : ROUNDS_SHORT[round]
 }
 
-export function weekLongLabel(week: number): string {
-  const round: Record<number, string> = {
-    19: 'Wild Card',
-    20: 'Divisional',
-    21: 'Conference',
-    22: 'Super Bowl',
-  }
-  return round[week] ?? `Week ${week}`
+/** "Wk 7" in the regular season, the round name after it. */
+export function weekShortLabel(season: number, week: number): string {
+  const round = postseasonRound(season, week)
+  return round === null ? `Wk ${week}` : ROUNDS_SHORT[round]
+}
+
+export function weekLongLabel(season: number, week: number): string {
+  const round = postseasonRound(season, week)
+  return round === null ? `Week ${week}` : ROUNDS_LONG[round]
 }
 
 export function quarterLabelShort(qtr: number): string {
@@ -105,6 +114,7 @@ export function reconcile(plays: Play[], filter: PlayFilter | null): PlayFilter 
 
 export interface GameGroup {
   gameId: string
+  season: number
   week: number
   opponent: string
   /** True when the team being viewed played this one at home. */
@@ -151,6 +161,7 @@ export function groupByGame(plays: Play[]): GameGroup[] {
     }
     groups.push({
       gameId: play.game_id,
+      season: play.season,
       week: play.week,
       opponent: play.defteam,
       home: play.posteam_home,

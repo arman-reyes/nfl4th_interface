@@ -30,7 +30,7 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
         {games.map((game) => (
         <li key={game.gameId}>
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 border-y border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-600 first:border-t-0">
-            {weekLongLabel(game.week)}
+            {weekLongLabel(game.season, game.week)}
             <span className="font-normal text-stone-400">{game.home ? 'vs' : 'at'}</span>
             <TeamPill abbr={game.opponent} />
             {game.result && <Result result={game.result} />}

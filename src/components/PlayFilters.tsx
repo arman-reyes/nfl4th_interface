@@ -50,7 +50,7 @@ export function PlayFilters({ plays, team, filter, onChange }: Props) {
             selected={filter.week === week}
             onClick={() => onChange({ ...filter, week, qtr: ALL })}
           >
-            {weekLabel(week)}
+            {weekLabel(filter.season, week)}
           </Chip>
         ))}
       </Row>

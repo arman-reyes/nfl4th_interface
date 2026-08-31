@@ -98,7 +98,7 @@ function Column({ title, caption, games, onSelectGame }: ColumnProps) {
                 className="flex w-full items-center gap-2 rounded-sm px-1.5 py-1.5 text-left hover:bg-stone-100 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none"
               >
                 <span className="w-11 shrink-0 text-[0.6875rem] font-semibold text-stone-500">
-                  {weekShortLabel(game.week)}
+                  {weekShortLabel(game.season, game.week)}
                 </span>
                 <span className="shrink-0 text-[0.6875rem] text-stone-400">
                   {game.home ? 'vs' : 'at'}

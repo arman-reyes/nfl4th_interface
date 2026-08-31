@@ -16,6 +16,7 @@ import type { GameResult } from './filters'
  */
 export interface GameSummary {
   gameId: string
+  season: number
   week: number
   opponent: string
   home: boolean
@@ -41,6 +42,7 @@ export function summarizeGames(plays: Play[]): GameSummary[] {
     if (!game) {
       game = {
         gameId: play.game_id,
+        season: play.season,
         week: play.week,
         opponent: play.defteam,
         home: play.posteam_home,

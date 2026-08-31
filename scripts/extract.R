@@ -17,7 +17,12 @@ library(dplyr)
 library(purrr)
 library(jsonlite)
 
-SEASONS <- 2020:2025
+# 2014 is nfl4th's floor: load_4th_pbp() refuses anything earlier, and the
+# precomputed release assets start there too. nflreadr standardises historical
+# team codes on the way through, so the pre-relocation seasons arrive as LA,
+# LAC and LV rather than STL, SD and OAK, and a team file stays franchise-
+# continuous without any mapping here.
+SEASONS <- 2014:2025
 
 KEEP <- c(
   "game_id", "play_id", "desc", "season", "week", "qtr",

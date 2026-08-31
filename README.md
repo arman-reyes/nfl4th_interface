@@ -19,18 +19,24 @@ npm run dev
 
 Three stages, two of which you run yourself.
 
-**1. R — extract the model output.** `scripts/extract.R` loads six seasons of 4th
-downs, runs `nfl4th::add_4th_probs()`, and writes one JSON file per team to
+**1. R — extract the model output.** `scripts/extract.R` loads twelve seasons of
+4th downs, runs `nfl4th::add_4th_probs()`, and writes one JSON file per team to
 `public/data/teams/` plus the raw team metadata to `public/data/index.json`.
 
 ```bash
-Rscript scripts/extract.R    # ~25 minutes for 2020-2025
+Rscript scripts/extract.R    # ~50 minutes for 2014-2025
 ```
 
 Needs R with `nfl4th`, `nflreadr`, `dplyr`, `purrr` and `jsonlite`. Seasons are
 processed one at a time and reduced to 4th downs immediately, because a full
-play-by-play frame for six seasons does not want to be in memory at once. The
-current data is 25,093 fourth downs across all 32 teams, 2020-2025.
+play-by-play frame for twelve seasons does not want to be in memory at once. The
+current data is 49,416 fourth downs across all 32 teams, 2014-2025.
+
+2014 is the floor: `load_4th_pbp()` refuses anything earlier and the precomputed
+release assets start there. nflreadr standardises historical team codes on the
+way through, so the pre-relocation seasons arrive as `LA`, `LAC` and `LV` rather
+than `STL`, `SD` and `OAK`, and a team file stays franchise-continuous with no
+mapping in this repository.
 
 **2. Node — build the index.** `npm run data:index` reads those files and rewrites
 `public/data/index.json` with precomputed per-season tendency metrics for all 32
@@ -43,10 +49,15 @@ when that team is selected.
 
 The league overview needs a headline metric for all 32 teams at once, and the app is
 only allowed to fetch the selected team's file. Computing the metrics in the browser
-would mean pulling all 32 team files (~9 MB) on the landing screen. So they are
+would mean pulling all 32 team files (~32 MB) on the landing screen. So they are
 computed at build time — by `src/lib/metrics.ts`, the same module the team profile
-calls at runtime, so the grid and the profile cannot disagree. `index.json` is 53 KB;
-a team file is around 280 KB.
+calls at runtime, so the grid and the profile cannot disagree.
+
+Sizes, which matter because a team file is fetched whole: `index.json` is 100 KB
+(17 KB gzipped) and loads once; a team file is around 940 KB (145 KB gzipped) and
+holds roughly 1,500 plays. Served behind a CDN with compression enabled that is a
+single small request per team, cached at the edge — so **turn on automatic
+compression** on the distribution, because uncompressed it is seven times bigger.
 
 ### Fixture data
 
@@ -77,7 +88,7 @@ Every number in the interface traces to a field in the data or to one of these:
 | Aggressiveness | Of the 4th downs where the model recommended going, the share the staff actually went for. |
 | Agreement rate | Share of all classifiable 4th downs where the actual choice matched the model's top option. |
 | WP forfeited | Per play, (best option's WP − chosen option's WP) in percentage points; summed, and divided by games. |
-| Go expected value | `go_wp` is exactly `first_down_prob × wp_succeed + (1 − first_down_prob) × wp_fail`. Verified against all 25,093 plays: the identity holds to the last decimal place on every one, which is why the card draws it as two weighted branches. |
+| Go expected value | `go_wp` is exactly `first_down_prob × wp_succeed + (1 − first_down_prob) × wp_fail`. Verified against all 49,416 plays: the identity holds to the last decimal place on every one, which is why the card draws it as two weighted branches. |
 | Impact tier | The forfeited points banded on the same 1-and-3 scale as the strength band: *minor*, *notable*, *costly*. |
 | Game state | How live the game was, from the win probability carried by the model's own recommendation: *in doubt* inside 35–65%, *leaning* to 15/85, *lopsided* to 5/95, *decided* beyond it. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
@@ -94,18 +105,20 @@ it is small.
 
 Win probability is already a linear currency, so the points forfeited need no
 leverage multiplier — applying one would double-count. The data bears this out.
-Of 6,749 disagreements across 2020–2025:
+Of 14,320 disagreements across 2014–2025:
 
 | Game state at the decision | n | Mean cost | Max | Over 3 pts |
 |---|---|---|---|---|
-| In doubt (35–65%) | 1,767 | 1.85 | 13.8 | 18% |
-| Leaning (65–85%) | 2,245 | 1.47 | 13.0 | 11% |
-| Lopsided (85–95%) | 1,218 | 0.90 | 8.0 | 3% |
-| Decided (>95 / <5%) | 1,519 | 0.29 | 4.2 | 0% |
+| In doubt (35–65%) | 3,774 | 1.96 | 16.8 | 20% |
+| Leaning (65–85%) | 4,878 | 1.58 | 13.0 | 13% |
+| Lopsided (85–95%) | 2,531 | 0.97 | 16.1 | 3% |
+| Decided (>95 / <5%) | 3,137 | 0.29 | 4.2 | 0% |
 
-None of the 125 disagreements costing more than five points happened in a game
-that was already decided, and decided games carry 5.4% of all forfeited win
-probability while making up 22.5% of the disagreements.
+None of the 343 disagreements costing more than five points happened in a game
+that was already decided, and decided games carry 4.9% of all forfeited win
+probability while making up 21.9% of the disagreements. The decided-game row is
+unchanged from the 2020–2025 subset to two decimal places, which is a good sign
+the banding is picking up something real rather than an artefact of one era.
 
 So the cost already suppresses itself. What it does not do is distinguish a
 0.3-point call in a tie game — a close one the staff nearly got right — from

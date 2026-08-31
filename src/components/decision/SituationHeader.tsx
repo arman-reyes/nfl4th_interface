@@ -49,7 +49,7 @@ export function SituationHeader({ play, team }: Props) {
         <Divider />
         <Fact label="Game">
           <span className="inline-flex items-center gap-1.5">
-            {play.season} {weekLongLabel(play.week)} {play.posteam_home ? 'vs' : 'at'}{' '}
+            {play.season} {weekLongLabel(play.season, play.week)} {play.posteam_home ? 'vs' : 'at'}{' '}
             <TeamPill abbr={play.defteam} />
             {result && (
               <span className="tnum font-normal text-stone-500">

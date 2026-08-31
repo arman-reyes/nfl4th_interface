@@ -19,10 +19,25 @@ const plays = [
 ]
 
 describe('weekLabel', () => {
-  it('names the postseason rounds rather than counting past 18', () => {
-    expect(weekLabel(7)).toBe('7')
-    expect(weekLabel(21)).toBe('CONF')
-    expect(weekLabel(22)).toBe('SB')
+  it('names the postseason rounds rather than counting past the regular season', () => {
+    expect(weekLabel(2024, 7)).toBe('7')
+    expect(weekLabel(2024, 19)).toBe('WC')
+    expect(weekLabel(2024, 22)).toBe('SB')
+  })
+
+  it('moves the playoff weeks with the season that grew to 18 games', () => {
+    // 2020 and earlier: 17 regular-season weeks, so Wild Card is week 18.
+    expect(weekLabel(2014, 17)).toBe('17')
+    expect(weekLabel(2014, 18)).toBe('WC')
+    expect(weekLabel(2014, 21)).toBe('SB')
+    // 2021 onward: 18 regular-season weeks, so week 18 is still the regular one.
+    expect(weekLabel(2021, 18)).toBe('18')
+    expect(weekLabel(2021, 19)).toBe('WC')
+  })
+
+  it('reads Seattle 2014 correctly, where a bye meant no Wild Card game', () => {
+    // They played weeks 19, 20 and 21 — Divisional, Conference, Super Bowl.
+    expect([19, 20, 21].map((w) => weekLabel(2014, w))).toEqual(['DIV', 'CONF', 'SB'])
   })
 })
 
