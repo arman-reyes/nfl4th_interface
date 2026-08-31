@@ -1,4 +1,4 @@
-import type { Choice, Play } from '../../types'
+import type { Choice, PlayFacts } from '../../types'
 import { CHOICE_VERB } from '../../lib/decision'
 import { CHOICES, choiceMatrix } from '../../lib/metrics'
 import { pct } from '../../lib/format'
@@ -12,13 +12,20 @@ import { pct } from '../../lib/format'
 /** Column headers: what the staff did. Short enough to fit a phone. */
 const DID: Record<Choice, string> = { go: 'Went', fg: 'Kicked', punt: 'Punted' }
 
-export function DecisionMatrix({ plays }: { plays: Play[] }) {
-  const rows = choiceMatrix(plays)
+interface Props {
+  plays: PlayFacts[]
+  /** Defaults to the staff's own call; the quiz passes the reader's. */
+  choiceOf?: (play: PlayFacts) => Choice | null
+  heading?: string
+}
+
+export function DecisionMatrix({ plays, choiceOf, heading }: Props) {
+  const rows = choiceMatrix(plays, choiceOf)
 
   return (
     <section>
       <h3 className="text-xs font-bold tracking-[0.18em] text-stone-500 uppercase">
-        Decisions against the model
+        {heading ?? 'Decisions against the model'}
       </h3>
 
       <div className="mt-3 overflow-x-auto">

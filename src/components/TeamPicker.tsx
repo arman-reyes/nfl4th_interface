@@ -9,6 +9,7 @@ interface Props {
   onSelect: (abbr: TeamAbbr) => void
   onAbout: () => void
   onTrends: () => void
+  onQuiz: () => void
 }
 
 const CONFERENCES = ['AFC', 'NFC'] as const
@@ -16,7 +17,7 @@ const CONFERENCES = ['AFC', 'NFC'] as const
 const DIVISIONS = ['East', 'North', 'South', 'West'] as const
 
 /** Step one of the drill-down: whose 4th downs are we looking at. */
-export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends }: Props) {
+export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends, onQuiz }: Props) {
   return (
     <div className="space-y-8">
       <div>
@@ -77,6 +78,21 @@ export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends }: Prop
           </div>
         </section>
       ))}
+
+      <button
+        onClick={onQuiz}
+        className="group w-full rounded-lg bg-stone-900 px-5 py-6 text-left transition-colors hover:bg-stone-800 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none sm:px-7 sm:py-7"
+      >
+        <span className="block text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+          Think you can make the right call on 4th down?
+        </span>
+        <span className="mt-1.5 flex items-center gap-2 text-sm text-stone-300">
+          Ten real situations, twenty seconds each — then see how you score against the model.
+          <span aria-hidden className="transition-transform group-hover:translate-x-1">
+            →
+          </span>
+        </span>
+      </button>
     </div>
   )
 }

@@ -132,3 +132,16 @@ export type Choice = 'go' | 'fg' | 'punt'
 
 /** How strongly the model holds its recommendation. */
 export type Band = 'coin flip' | 'lean' | 'clear'
+
+/**
+ * Everything a 4th-down decision is judged on: the play without its narration.
+ *
+ * The decision rules take this rather than a full `Play`, because none of them
+ * look at `desc` — and the quiz pool ships without it on purpose. The
+ * description narrates what actually happened, and the argument of this whole
+ * tool is that a decision is judged on what was knowable at the snap.
+ */
+export type PlayFacts = Omit<Play, 'desc'>
+
+/** A play in the quiz pool: the facts, with the outcome withheld. */
+export type QuizPlay = PlayFacts

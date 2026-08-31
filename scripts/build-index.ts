@@ -19,11 +19,31 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { summarizeAll } from '../src/lib/metrics.ts'
-import type { LeagueIndex, Play, TeamIndexEntry, TeamMeta } from '../src/types.ts'
+import { actualChoice } from '../src/lib/decision.ts'
+import type { LeagueIndex, Play, QuizPlay, TeamIndexEntry, TeamMeta } from '../src/types.ts'
 
 const INDEX_PATH = 'public/data/index.json'
+const QUIZ_PATH = 'public/data/quiz.json'
 const TEAM_DIR = 'public/data/teams'
 const isFixture = process.argv.includes('--fixture')
+
+/**
+ * How many 4th downs to keep for the quiz. Enough that consecutive rounds do
+ * not repeat, small enough to be one quick request.
+ */
+const QUIZ_POOL = 400
+
+/** Deterministic shuffle, so the pool is stable across rebuilds. */
+function seededShuffle<T>(items: T[], seed: number): T[] {
+  let state = seed >>> 0
+  const out = [...items]
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0
+    const j = state % (i + 1)
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
 
 function readTeamMeta(): TeamMeta[] {
   const raw: unknown = JSON.parse(readFileSync(INDEX_PATH, 'utf-8'))
@@ -41,6 +61,7 @@ function readTeamMeta(): TeamMeta[] {
 const meta = readTeamMeta()
 const teams: TeamIndexEntry[] = []
 const seasons = new Set<number>()
+const quizCandidates: Play[] = []
 
 for (const team of meta) {
   const path = `${TEAM_DIR}/${team.team_abbr}.json`
@@ -50,6 +71,8 @@ for (const team of meta) {
   }
   const plays = JSON.parse(readFileSync(path, 'utf-8')) as Play[]
   for (const play of plays) seasons.add(play.season)
+  // Only plays that carried a real decision can be asked about.
+  quizCandidates.push(...plays.filter((p) => actualChoice(p) !== null))
   const summaries = summarizeAll(plays)
   teams.push({ ...team, summaries })
 
@@ -69,6 +92,15 @@ const index: LeagueIndex = {
 }
 
 writeFileSync(INDEX_PATH, JSON.stringify(index))
+
+// The quiz pool: a uniform random sample of real 4th downs, minus the play
+// description, which narrates the outcome the quiz must not reveal.
+const pool: QuizPlay[] = seededShuffle(quizCandidates, 20260830)
+  .slice(0, QUIZ_POOL)
+  .map(({ desc: _desc, ...rest }) => rest)
+writeFileSync(QUIZ_PATH, JSON.stringify(pool))
+process.stdout.write(`Wrote ${QUIZ_PATH}: ${pool.length} of ${quizCandidates.length} decisions
+`)
 process.stdout.write(
   `\nWrote ${INDEX_PATH}: ${teams.length} teams, seasons ${index.seasons.at(-1)}-${index.seasons[0]}` +
     `${isFixture ? ' (FIXTURE DATA)' : ''}\n`,

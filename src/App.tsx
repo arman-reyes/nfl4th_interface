@@ -13,6 +13,7 @@ import { TeamPicker } from './components/TeamPicker'
 import { TeamSummary } from './components/TeamSummary'
 import { AboutDialog } from './components/AboutDialog'
 import { LeagueTrends } from './components/LeagueTrends'
+import { QuizPage } from './components/QuizPage'
 
 /**
  * The drill-down: team, season, week, quarter, then the individual 4th down.
@@ -35,6 +36,7 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [showTrends, setShowTrends] = useState(false)
+  const [showQuiz, setShowQuiz] = useState(false)
   const team = useTeamData(abbr)
 
   const meta = index.data?.teams.find((t) => t.team_abbr === abbr)
@@ -78,6 +80,19 @@ export default function App() {
   if (index.error) return <Centered tone="error">{index.error.message}</Centered>
   if (!index.data) return null
 
+  if (showQuiz) {
+    return (
+      <>
+        <QuizPage
+          index={index.data}
+          onBack={() => setShowQuiz(false)}
+          onAbout={() => setAboutOpen(true)}
+        />
+        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+      </>
+    )
+  }
+
   if (showTrends) {
     return (
       <>
@@ -100,6 +115,7 @@ export default function App() {
           onSelect={chooseTeam}
           onAbout={() => setAboutOpen(true)}
           onTrends={() => setShowTrends(true)}
+          onQuiz={() => setShowQuiz(true)}
         />
         <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
       </main>

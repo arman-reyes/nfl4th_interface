@@ -1,4 +1,4 @@
-import type { Band, Choice, Play, TeamSummary } from '../types'
+import type { Band, Choice, Play, PlayFacts, TeamSummary } from '../types'
 import { actualChoice, agreed, modelChoice, wpForfeited } from './decision'
 import { gameResult } from './filters'
 import { BANDS, FIELD_ZONES, fieldZone, playBand } from './zones'
@@ -142,13 +142,19 @@ export interface MatrixRow {
 }
 
 /**
- * What the staff did against what the model asked for, as a 3x3 tally.
+ * What was actually done against what the model asked for, as a 3x3 tally.
  *
- * The diagonal is agreement; everything off it is where a staff's habits show.
- * Reading a row answers the question a scout actually has: "when the model
- * wanted them to go, what did they do instead?"
+ * The diagonal is agreement; everything off it is where a habit shows. Reading
+ * a row answers the question a scout actually has: "when the model wanted them
+ * to go, what did they do instead?"
+ *
+ * `choiceOf` defaults to the staff's call from `play_type`; the quiz passes the
+ * reader's own calls instead, so both render through the same component.
  */
-export function choiceMatrix(plays: Play[]): MatrixRow[] {
+export function choiceMatrix(
+  plays: PlayFacts[],
+  choiceOf: (play: PlayFacts) => Choice | null = actualChoice,
+): MatrixRow[] {
   const rows: MatrixRow[] = CHOICES.map((model) => ({
     model,
     total: 0,
@@ -156,12 +162,12 @@ export function choiceMatrix(plays: Play[]): MatrixRow[] {
   }))
 
   for (const play of plays) {
-    const actual = actualChoice(play)
-    if (actual === null) continue
+    const choice = choiceOf(play)
+    if (choice === null) continue
     const row = rows.find((r) => r.model === modelChoice(play))
     if (!row) continue
     row.total += 1
-    row.counts[actual] += 1
+    row.counts[choice] += 1
   }
   return rows
 }

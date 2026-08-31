@@ -1,4 +1,4 @@
-import type { LeagueIndex, Play, TeamAbbr } from '../types'
+import type { LeagueIndex, Play, QuizPlay, TeamAbbr } from '../types'
 
 /**
  * The only place the app talks to storage.
@@ -13,6 +13,8 @@ export interface DataSource {
   loadIndex(): Promise<LeagueIndex>
   /** One team's full play history. Fetched on selection, then cached. */
   loadTeamPlays(abbr: TeamAbbr): Promise<Play[]>
+  /** A sample of 4th downs for the quiz, without their descriptions. */
+  loadQuizPool(): Promise<QuizPlay[]>
 }
 
 const BASE = `${import.meta.env.BASE_URL}data`
@@ -50,9 +52,12 @@ const fetchTeam = memoize<TeamAbbr, Play[]>((abbr) =>
   getJson<Play[]>(`${BASE}/teams/${abbr}.json`),
 )
 
+const fetchQuiz = memoize<'quiz', QuizPlay[]>(() => getJson<QuizPlay[]>(`${BASE}/quiz.json`))
+
 export const staticDataSource: DataSource = {
   loadIndex: () => fetchIndex('index'),
   loadTeamPlays: (abbr) => fetchTeam(abbr),
+  loadQuizPool: () => fetchQuiz('quiz'),
 }
 
 export const dataSource: DataSource = staticDataSource

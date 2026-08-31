@@ -131,6 +131,33 @@ Showing a flat scatter invited the conclusion that none of it matters, which is
 the opposite of what the arithmetic says. The per-decision numbers are the
 product; a 17-game record is the wrong instrument for reading them.
 
+## Make the call
+
+A quiz, reached from the button at the bottom of the landing screen. Ten real
+4th downs, twenty seconds each, go / kick / punt — then the reader's own numbers
+in the same format a coaching staff gets: aggressiveness, agreement, win
+probability given up, and the 3x3 of their calls against the model, with the
+median NFL staff shown beside the first two for scale.
+
+Four decisions shape it:
+
+- **The pool ships without `desc`.** The play description narrates what actually
+  happened, and the reveal never shows it. The quiz is scored on the decision,
+  and revealing the outcome would teach exactly the lesson this tool argues
+  against. `scripts/build-index.ts` writes `public/data/quiz.json`, a uniform
+  random sample of 400 real decisions (220 KB, 35 KB gzipped), stripped of the
+  description.
+- **Four of the ten are situations the model would go for.** Fixed rather than
+  left to chance, because aggressiveness needs a denominator — and 4 in 10 is
+  close to the league's real rate of about 41%, so a round still feels like a
+  season.
+- **Options the model cannot price are offered as unavailable.** nfl4th prices
+  no punt from inside the opponent's 30 and no kick from beyond range. Offering
+  those as live buttons made an unscoreable call look like a timeout and left
+  the aggressiveness denominator disagreeing with the matrix.
+- **Running out of time is not a call.** It is excluded the way a penalty is, and
+  the results say how many.
+
 ## About dialog
 
 The question-mark button, top right on both the picker and the team banner,

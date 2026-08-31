@@ -1,4 +1,4 @@
-import type { Band, Choice, Play } from '../types'
+import type { Band, Choice, PlayFacts } from '../types'
 
 /**
  * The decision rules. Every derived number in the app comes from this file,
@@ -24,13 +24,13 @@ const PLAY_TYPE_TO_CHOICE: Record<string, Choice> = {
  * Returns null for anything else (penalties, aborted snaps, no-plays), which
  * excludes the play from every agreement statistic.
  */
-export function actualChoice(play: Play): Choice | null {
+export function actualChoice(play: PlayFacts): Choice | null {
   if (!play.play_type) return null
   return PLAY_TYPE_TO_CHOICE[play.play_type] ?? null
 }
 
 /** The options available in this situation, best first. */
-export function options(play: Play): Option[] {
+export function options(play: PlayFacts): Option[] {
   const all: Option[] = [{ choice: 'go', wp: play.go_wp }]
   if (play.fg_wp != null) all.push({ choice: 'fg', wp: play.fg_wp })
   if (play.punt_wp != null) all.push({ choice: 'punt', wp: play.punt_wp })
@@ -45,7 +45,7 @@ export function options(play: Play): Option[] {
  * `go_boost = 100 * (go_wp - max(fg_wp, punt_wp))`, and JSON rounding can put
  * an argmax on the other side of a hairline gap.
  */
-export function modelChoice(play: Play): Choice {
+export function modelChoice(play: PlayFacts): Choice {
   if (play.go_boost > 0) return 'go'
   return bestNonGo(play) ?? 'go'
 }
@@ -55,7 +55,7 @@ export function modelChoice(play: Play): Choice {
  * against. Null only if the situation allows neither, which nfl4th's own
  * filter makes unreachable in practice.
  */
-export function bestNonGo(play: Play): Choice | null {
+export function bestNonGo(play: PlayFacts): Choice | null {
   const fg = play.fg_wp
   const punt = play.punt_wp
   if (fg == null && punt == null) return null
@@ -65,7 +65,7 @@ export function bestNonGo(play: Play): Choice | null {
 }
 
 /** Expected win probability of one choice, or null if it was unavailable. */
-export function wpOf(play: Play, choice: Choice): number | null {
+export function wpOf(play: PlayFacts, choice: Choice): number | null {
   if (choice === 'go') return play.go_wp
   if (choice === 'fg') return play.fg_wp
   return play.punt_wp
@@ -76,7 +76,7 @@ export function wpOf(play: Play, choice: Choice): number | null {
  * Zero when the staff agreed with the model, null when the play carries no
  * classifiable decision.
  */
-export function wpForfeited(play: Play): number | null {
+export function wpForfeited(play: PlayFacts): number | null {
   const actual = actualChoice(play)
   if (actual === null) return null
   const chosen = wpOf(play, actual)
@@ -88,7 +88,7 @@ export function wpForfeited(play: Play): number | null {
   return Math.max(0, (best - chosen) * 100)
 }
 
-export function agreed(play: Play): boolean | null {
+export function agreed(play: PlayFacts): boolean | null {
   const actual = actualChoice(play)
   if (actual === null) return null
   return actual === modelChoice(play)

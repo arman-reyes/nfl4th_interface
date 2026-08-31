@@ -1,4 +1,4 @@
-import type { Play } from '../types'
+import type { PlayFacts } from '../types'
 
 /** Win probability 0-1 rendered as whole percentage points. */
 export function pct(p: number, digits = 0): string {
@@ -50,20 +50,20 @@ export interface FieldSpot {
   yard: number
 }
 
-export function fieldSpot(play: Play): FieldSpot {
+export function fieldSpot(play: PlayFacts): FieldSpot {
   const y = play.yardline_100
   if (y === 50) return { side: null, yard: 50 }
   if (y < 50) return { side: play.defteam, yard: y }
   return { side: play.posteam, yard: 100 - y }
 }
 
-export function fieldPosition(play: Play): string {
+export function fieldPosition(play: PlayFacts): string {
   const spot = fieldSpot(play)
   return spot.side === null ? 'the 50' : `${spot.side} ${spot.yard}`
 }
 
 /** "4th & 3 at the KC 38" */
-export function situationLine(play: Play): string {
+export function situationLine(play: PlayFacts): string {
   return `4th & ${play.ydstogo} at ${fieldPosition(play)}`
 }
 
@@ -73,6 +73,6 @@ export function scoreLine(diff: number): string {
   return `Down ${-diff}`
 }
 
-export function gameLabel(play: Play): string {
+export function gameLabel(play: PlayFacts): string {
   return `${play.season} Wk ${play.week} vs ${play.defteam}`
 }

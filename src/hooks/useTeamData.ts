@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { dataSource } from '../data/client'
-import type { LeagueIndex, Play, TeamAbbr } from '../types'
+import type { LeagueIndex, Play, QuizPlay, TeamAbbr } from '../types'
 import { useAsync } from './useAsync'
 import type { AsyncState } from './useAsync'
 
@@ -17,4 +17,10 @@ export function useTeamData(abbr: TeamAbbr | null): AsyncState<Play[]> {
 export function useLeagueIndex(): AsyncState<LeagueIndex> {
   const load = useCallback(() => dataSource.loadIndex(), [])
   return useAsync<LeagueIndex>('index', load)
+}
+
+/** The quiz pool. Loaded once, on the quiz page only. */
+export function useQuizPool(): AsyncState<QuizPlay[]> {
+  const load = useCallback(() => dataSource.loadQuizPool(), [])
+  return useAsync<QuizPlay[]>('quiz', load)
 }
