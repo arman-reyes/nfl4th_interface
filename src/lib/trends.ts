@@ -1,37 +1,14 @@
 import type { LeagueIndex, TeamSummary } from '../types'
+import type { LeagueMetric } from './league'
 
 /**
- * League-wide trends: one value per team per season, for a chosen metric.
- *
- * Everything here reads `index.json` alone. The per-season summaries are
- * already precomputed there, so the trends view needs no team files at all —
- * it is one small request no matter how many teams are on the chart.
+ * Setting a tendency against how teams actually finished — and, more usefully,
+ * working out whether that comparison could ever have shown anything.
  */
-
-export type TrendMetricKey =
-  | 'aggressiveness'
-  | 'agreement'
-  | 'forfeited'
-  | 'forfeitedPerGame'
-  | 'winPct'
-
-export interface TrendMetric {
-  key: TrendMetricKey
-  label: string
-  /** Null when the season has no denominator for it. */
-  value: (summary: TeamSummary) => number | null
-  format: (value: number) => string
-  /** Bounds the fitted axis may not exceed, e.g. a share cannot leave 0-1. */
-  clamp: [number, number] | null
-  note: string
-}
-
-const pct = (v: number) => `${(v * 100).toFixed(0)}%`
-const pts = (v: number) => v.toFixed(1)
 
 /**
  * Winning percentage the way the NFL counts it: a tie is half a win. Records
- * here cover every game in the data, postseason included.
+ * cover every game in the data, postseason included.
  */
 export function winPct(summary: TeamSummary): number | null {
   const played = summary.wins + summary.losses + summary.ties
@@ -44,129 +21,6 @@ export function recordLabel(summary: TeamSummary): string {
   return summary.ties > 0 ? `${base}-${summary.ties}` : base
 }
 
-export const TREND_METRICS: TrendMetric[] = [
-  {
-    key: 'aggressiveness',
-    label: 'Aggressiveness',
-    value: (s) => s.aggressiveness,
-    format: pct,
-    clamp: [0, 1],
-    note: 'Of the 4th downs where the model recommended going, the share the staff went for.',
-  },
-  {
-    key: 'agreement',
-    label: 'Agreement',
-    value: (s) => s.agreement,
-    format: pct,
-    clamp: [0, 1],
-    note: "Share of decisions matching the model's top option.",
-  },
-  {
-    key: 'forfeited',
-    label: 'Given up, total',
-    value: (s) => s.wp_forfeited,
-    format: pts,
-    clamp: [0, Infinity],
-    note: 'Win probability points given up across the season. Seasons before 2021 were 16 games rather than 17, so totals are not perfectly comparable across that line — the per-game metric is.',
-  },
-  {
-    key: 'forfeitedPerGame',
-    label: 'Given up, per game',
-    value: (s) => s.wp_forfeited_per_game,
-    format: pts,
-    clamp: [0, Infinity],
-    note: 'The same figure divided by games played, which is comparable across every season.',
-  },
-  {
-    key: 'winPct',
-    label: 'Win %',
-    value: winPct,
-    format: pct,
-    clamp: [0, 1],
-    note: 'Every game in the data, postseason included. A tie counts as half a win.',
-  },
-]
-
-export function metricByKey(key: TrendMetricKey): TrendMetric {
-  return TREND_METRICS.find((m) => m.key === key) ?? TREND_METRICS[0]
-}
-
-export interface TrendPoint {
-  season: number
-  /** Null when the team has no data for that season, or the metric no denominator. */
-  value: number | null
-  summary: TeamSummary | null
-}
-
-export interface TrendSeries {
-  abbr: string
-  name: string
-  points: TrendPoint[]
-}
-
-/** Every season in the index, oldest first, which is how a trend reads. */
-export function trendSeasons(index: LeagueIndex): number[] {
-  return [...index.seasons].sort((a, b) => a - b)
-}
-
-/** One series per team, with a point for every league season so lines align. */
-export function buildSeries(
-  index: LeagueIndex,
-  metric: TrendMetric,
-  abbrs?: string[],
-): TrendSeries[] {
-  const seasons = trendSeasons(index)
-  const wanted = abbrs ? new Set(abbrs) : null
-
-  return index.teams
-    .filter((team) => (wanted ? wanted.has(team.team_abbr) : true))
-    .map((team) => {
-      const bySeason = new Map(team.summaries.map((s) => [s.season, s]))
-      return {
-        abbr: team.team_abbr,
-        name: team.team_name,
-        points: seasons.map((season) => {
-          const summary = bySeason.get(season) ?? null
-          return { season, value: summary ? metric.value(summary) : null, summary }
-        }),
-      }
-    })
-}
-
-/** The league median for each season, the reference a single line is read against. */
-export function medianSeries(series: TrendSeries[], seasons: number[]): (number | null)[] {
-  return seasons.map((_, index) => {
-    const values = series
-      .map((s) => s.points[index]?.value)
-      .filter((v): v is number => v !== null && v !== undefined)
-      .sort((a, b) => a - b)
-    if (values.length === 0) return null
-    const middle = Math.floor(values.length / 2)
-    return values.length % 2 === 0 ? (values[middle - 1] + values[middle]) / 2 : values[middle]
-  })
-}
-
-/**
- * The axis range, fitted to the data with a little padding and held inside the
- * metric's natural bounds.
- *
- * Always computed across all 32 teams, never the selection: an axis that
- * rescaled every time a team was toggled would make two selections
- * incomparable, and the grey context lines behind would slide with it.
- */
-export function valueExtent(series: TrendSeries[], metric: TrendMetric): [number, number] {
-  const values = series
-    .flatMap((s) => s.points.map((p) => p.value))
-    .filter((v): v is number => v !== null)
-  if (values.length === 0) return [0, 1]
-  const lo = Math.min(...values)
-  const hi = Math.max(...values)
-  if (hi === lo) return [lo - 1, hi + 1]
-  const pad = (hi - lo) * 0.08
-  const [floor, ceiling] = metric.clamp ?? [-Infinity, Infinity]
-  return [Math.max(floor, lo - pad), Math.min(ceiling, hi + pad)]
-}
-
 export interface Pair {
   abbr: string
   season: number
@@ -175,29 +29,31 @@ export interface Pair {
   record: string
 }
 
-/**
- * Every team-season as a (metric, win percentage) pair, for the scatter that
- * asks whether a tendency travels with winning.
- */
-export function metricAgainstRecord(series: TrendSeries[], metric: TrendMetric): Pair[] {
+/** Every team-season as a (metric, win percentage) pair. */
+export function metricAgainstRecord(index: LeagueIndex, metric: LeagueMetric): Pair[] {
   const pairs: Pair[] = []
-  for (const team of series) {
-    for (const point of team.points) {
-      if (point.summary === null) continue
-      const x = metric.value(point.summary)
-      const y = winPct(point.summary)
+  for (const team of index.teams) {
+    for (const summary of team.summaries) {
+      if (summary.season === null) continue
+      const x = metric.value(summary)
+      const y = winPct(summary)
       if (x === null || y === null) continue
-      pairs.push({ abbr: team.abbr, season: point.season, x, y, record: recordLabel(point.summary) })
+      pairs.push({
+        abbr: team.team_abbr,
+        season: summary.season,
+        x,
+        y,
+        record: recordLabel(summary),
+      })
     }
   }
   return pairs
 }
 
 /**
- * Pearson correlation. Reported with n beside it and described as an
- * association, because that is all it is: these are 32 teams making their own
- * decisions, not an experiment, and the causation could run either way — a
- * team that is behind goes for it more.
+ * Pearson correlation. Always reported with n beside it and described as an
+ * association: 32 teams making their own decisions is not an experiment, and
+ * the causation could run either way — a team that is behind goes for it more.
  */
 export function pearson(pairs: Pair[]): number | null {
   const n = pairs.length
@@ -218,6 +74,18 @@ export function pearson(pairs: Pair[]): number | null {
   return covariance / Math.sqrt(varianceX * varianceY)
 }
 
+/** The horizontal range for the scatter, padded and held inside the metric's bounds. */
+export function pairExtent(pairs: Pair[], metric: LeagueMetric): [number, number] {
+  if (pairs.length === 0) return [0, 1]
+  const xs = pairs.map((p) => p.x)
+  const lo = Math.min(...xs)
+  const hi = Math.max(...xs)
+  if (hi === lo) return [lo - 1, hi + 1]
+  const pad = (hi - lo) * 0.06
+  const [floor, ceiling] = metric.clamp ?? [-Infinity, Infinity]
+  return [Math.max(floor, lo - pad), Math.min(ceiling, hi + pad)]
+}
+
 /**
  * How big the thing being measured actually is, and whether a correlation
  * against the standings could ever see it.
@@ -225,7 +93,7 @@ export function pearson(pairs: Pair[]): number | null {
  * Win probability points sum to expected wins by definition — a hundred points
  * is one win — so the cost of a season of 4th-down calls can be stated in wins
  * without any correlation at all. The correlation is a far weaker instrument,
- * and this reports the arithmetic that says so.
+ * and this is the arithmetic that says so.
  */
 export interface EffectSize {
   n: number
@@ -233,7 +101,7 @@ export interface EffectSize {
   meanWins: number
   sdWins: number
   maxWins: number
-  /** Spread in actual wins, which is what the correlation has to see through. */
+  /** Spread in actual wins, which is what a correlation has to see through. */
   sdActualWins: number
   /** The largest r possible if 4th-down cost were the only thing that varied. */
   ceiling: number

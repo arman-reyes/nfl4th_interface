@@ -1,51 +1,31 @@
-import { useMemo } from 'react'
 import { useElementWidth } from '../../hooks/useElementWidth'
-import { accentOnLight } from '../../lib/color'
-import type { TrendMetric, TrendSeries } from '../../lib/trends'
-import { metricAgainstRecord, valueExtent } from '../../lib/trends'
+import type { LeagueMetric } from '../../lib/league'
+import type { Pair } from '../../lib/trends'
+import { pairExtent } from '../../lib/trends'
 
 interface Props {
-  all: TrendSeries[]
-  selected: TrendSeries[]
-  metric: TrendMetric
+  pairs: Pair[]
+  metric: LeagueMetric
 }
 
 const PAD = { top: 12, right: 14, bottom: 44, left: 40 }
 const HEIGHT = 280
 
 /**
- * Every team-season as one dot: the metric against how the team finished. The
- * whole league is plotted, with the selection picked out in colour.
+ * Every team-season as one dot: the metric against how that team finished.
  *
  * The interpretation lives in AgainstRecord, which wraps this. On its own a
  * flat cloud invites the wrong conclusion, so the plot is never shown without
- * the arithmetic that says the correlation could not have seen the effect
- * anyway.
+ * the arithmetic saying the correlation could not have seen the effect anyway.
  */
-export function RecordScatter({ all, selected, metric }: Props) {
+export function RecordScatter({ pairs, metric }: Props) {
   const [container, width] = useElementWidth<HTMLDivElement>()
-  const league = useMemo(() => metricAgainstRecord(all, metric), [all, metric])
-  const highlighted = useMemo(() => new Set(selected.map((s) => s.abbr)), [selected])
 
-  if (metric.key === 'winPct') {
-    return (
-      <p className="text-sm text-stone-500">
-        Win percentage plotted against itself says nothing. Pick another metric to see how it
-        travels with a team&rsquo;s record.
-      </p>
-    )
-  }
-
-  const [lo, hi] = valueExtent(all, metric)
+  const [lo, hi] = pairExtent(pairs, metric)
   const innerWidth = Math.max(0, width - PAD.left - PAD.right)
   const innerHeight = HEIGHT - PAD.top - PAD.bottom
   const x = (v: number) => PAD.left + ((v - lo) / (hi - lo || 1)) * innerWidth
   const y = (v: number) => PAD.top + innerHeight - v * innerHeight
-
-  // Selected dots last, so they sit above the league.
-  const ordered = [...league].sort(
-    (a, b) => Number(highlighted.has(a.abbr)) - Number(highlighted.has(b.abbr)),
-  )
 
   return (
     <div>
@@ -55,7 +35,7 @@ export function RecordScatter({ all, selected, metric }: Props) {
             width={width}
             height={HEIGHT}
             role="img"
-            aria-label={`${metric.label} against win percentage, ${league.length} team-seasons`}
+            aria-label={`${metric.label} against win percentage, ${pairs.length} team-seasons`}
           >
             {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
               <g key={tick}>
@@ -93,23 +73,20 @@ export function RecordScatter({ all, selected, metric }: Props) {
               )
             })}
 
-            {ordered.map((pair) => {
-              const on = highlighted.has(pair.abbr)
-              return (
-                <circle
-                  key={`${pair.abbr}-${pair.season}`}
-                  cx={x(pair.x)}
-                  cy={y(pair.y)}
-                  r={on ? 4 : 2.5}
-                  fill={on ? accentOnLight(pair.abbr) : '#d6d3d1'}
-                  fillOpacity={on ? 0.9 : 0.7}
-                >
-                  <title>
-                    {pair.abbr} {pair.season} · {pair.record} · {metric.format(pair.x)}
-                  </title>
-                </circle>
-              )
-            })}
+            {pairs.map((pair) => (
+              <circle
+                key={`${pair.abbr}-${pair.season}`}
+                cx={x(pair.x)}
+                cy={y(pair.y)}
+                r={2.5}
+                fill="#78716c"
+                fillOpacity={0.5}
+              >
+                <title>
+                  {pair.abbr} {pair.season} · {pair.record} · {metric.format(pair.x)}
+                </title>
+              </circle>
+            ))}
 
             <text
               x={PAD.left + innerWidth / 2}
@@ -133,8 +110,8 @@ export function RecordScatter({ all, selected, metric }: Props) {
       </div>
 
       <p className="mt-1 text-xs leading-relaxed text-stone-400">
-        One dot per team-season, the whole league; selected teams in colour. Association, not cause
-        — a team that spends a season behind goes for it more, so the arrow can point either way.
+        One dot per team-season, {pairs.length} of them. Association, not cause — a team that spends
+        a season behind goes for it more, so the arrow can point either way.
       </p>
     </div>
   )

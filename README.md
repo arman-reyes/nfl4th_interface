@@ -70,34 +70,37 @@ numbers can never be mistaken for real ones.
 
 ## League trends
 
-A second view, reached from the header on either screen. One line per team per
-season, for aggressiveness, agreement, win probability given up (total and per
-game), or win percentage.
+A second view, reached from the header on either screen. Four league metrics
+across 2014–2025: each line is the median team, and the band behind it is the
+middle half of the league.
 
-It reads `index.json` alone — the per-season summaries are already precomputed
-there — so it is one small request no matter how many teams are on the chart,
-and no team file is fetched at all.
+Individual team lines were tried and dropped. Thirty-two of them is spaghetti,
+and one of them out of context says nothing — what is worth seeing here is where
+the league went, and how far apart its teams were while going there. The band is
+the half of the story a median hides: on aggressiveness it has widened, so the
+league did not move as a block.
 
-Three decisions shape it:
+It reads `index.json` alone, so the whole view is one small request.
 
-- **All 32 teams are always drawn, faintly, with the league median dashed.** A
-  single line means nothing on its own. League aggressiveness went from 24.6% in
-  2014 to 47.4% in 2025, so "38%" is only high or low relative to what everyone
-  else was doing that year.
-- **The axis is fitted across all 32, never the selection.** An axis that
-  rescaled when a team was toggled would make two selections incomparable and
-  would slide the context lines underneath them.
-- **Lines are labelled at their right end.** Ten of the 32 team colours resolve
-  to near-black on white, so colour alone cannot separate two selected lines.
-  Labels are nudged apart where lines finish together.
+### What it shows
 
-Hovering a season gives every selected team's value **and its record for that
-year**, since the record is the thing you want beside a tendency.
+| Metric | Median team, 2014 → 2025 |
+|---|---|
+| Aggressiveness | **22% → 50%** |
+| How often the model said go | 41% → 41% |
+| Agreement | 66% → 73% |
+| Win probability given up, per game | **3.53 → 1.93** |
 
-Beneath it, the honest version of "does any of this matter".
+The first two panels sit side by side because the contrast is the point. The
+model's advice barely moved across twelve seasons — the share of 4th downs where
+going was optimal is a property of the situations teams faced, not of what they
+did about them. What changed is what teams did with it, and the cost per game
+nearly halved.
 
-Win probability points are expected wins by definition — a hundred points is
-one win — so the size of the thing needs no correlation to state:
+### Does it show up in the standings?
+
+Win probability points are expected wins by definition — a hundred points is one
+win — so the size of the thing needs no correlation to state:
 
 | | |
 |---|---|
@@ -105,7 +108,7 @@ one win — so the size of the thing needs no correlation to state:
 | Worst team-season in the data | **1.00 wins** |
 | Spread across team-seasons | 0.16 wins |
 
-The correlation against actual records is the weaker instrument, and the panel
+The correlation against actual records is a far weaker instrument, and the panel
 shows the arithmetic that says so. Spread in wins given up is 0.16; spread in
 actual wins is 3.6. So even if 4th downs were the only thing separating two
 teams, r could not exceed **±0.045** — against a standard error of 0.051 at
@@ -114,18 +117,17 @@ the predicted result rather than evidence against the model.
 
 Which makes the measured correlations worth reading carefully:
 
-| Metric | r vs win % | |
+| Metric vs win % | r | |
 |---|---|---|
-| Aggressiveness | −0.16 | *larger* than decision quality could produce, so it is measuring the reverse — teams that spend a season behind go for it more, and losing teams spend seasons behind |
+| Win probability given up, per game | +0.03 | inside the noise floor |
 | Agreement | −0.02 | inside the noise floor |
-| Given up, per game | +0.03 | inside the noise floor |
-| Given up, total | +0.16 | an artefact — good teams play playoff games and accumulate more total |
+| Aggressiveness | −0.16 | *larger* than decision quality could produce, so it is measuring the reverse — teams that spend a season behind go for it more, and losing teams spend seasons behind |
 
-The total-versus-per-game pair is why both are offered. Two relationships are
-deliberately *not* shown, because they are close to definitional rather than
-findings: agreement against win probability given up (r = −0.69) and
-aggressiveness against it (r = −0.59). Agreeing with the model more mechanically
-means forfeiting less, so plotting it would dress up a tautology as a result.
+Two relationships are deliberately **not** shown, because they are close to
+definitional rather than findings: agreement against win probability given up
+(r = −0.69) and aggressiveness against it (r = −0.59). Agreeing with the model
+more mechanically means forfeiting less, so plotting it would dress a tautology
+up as a result.
 
 ## About dialog
 

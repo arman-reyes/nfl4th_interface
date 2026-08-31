@@ -1,9 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { LeagueIndex } from '../types'
-import type { TrendMetricKey } from '../lib/trends'
-import { buildSeries, metricByKey, TREND_METRICS, trendSeasons } from '../lib/trends'
-import { TrendChart } from './trends/TrendChart'
-import { TeamMultiSelect } from './trends/TeamMultiSelect'
+import { LEAGUE_METRICS, movement, seasonSpreads } from '../lib/league'
+import { LeagueTrendPanel } from './trends/LeagueTrendPanel'
 import { AgainstRecord } from './trends/AgainstRecord'
 import { AboutButton } from './AboutButton'
 
@@ -13,23 +11,21 @@ interface Props {
   onAbout: () => void
 }
 
-/** Default selection: enough lines to compare, few enough to read. */
-const OPENING = ['BAL', 'PHI', 'PIT']
-
+/**
+ * The league, not the teams.
+ *
+ * Individual team lines were dropped from this view: thirty-two of them is
+ * spaghetti, and one of them out of context says nothing. What is worth seeing
+ * here is where the league went, and how far apart its teams are while going
+ * there.
+ */
 export function LeagueTrends({ index, onBack, onAbout }: Props) {
-  const [metricKey, setMetricKey] = useState<TrendMetricKey>('aggressiveness')
-  const [selected, setSelected] = useState<string[]>(OPENING)
+  const seasons = useMemo(() => [...index.seasons].sort((a, b) => a - b), [index])
 
-  const metric = metricByKey(metricKey)
-  const seasons = useMemo(() => trendSeasons(index), [index])
-  const all = useMemo(() => buildSeries(index, metric), [index, metric])
-  const chosen = useMemo(() => all.filter((s) => selected.includes(s.abbr)), [all, selected])
-
-  function toggle(abbr: string) {
-    setSelected((current) =>
-      current.includes(abbr) ? current.filter((a) => a !== abbr) : [...current, abbr],
-    )
-  }
+  // The headline is the contrast between the first two panels: what the model
+  // asked for barely moved, while what teams did about it roughly doubled.
+  const aggressiveness = useMemo(() => movement(seasonSpreads(index, LEAGUE_METRICS[0])), [index])
+  const saidGo = useMemo(() => movement(seasonSpreads(index, LEAGUE_METRICS[1])), [index])
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-3 py-5 sm:px-6 sm:py-8">
@@ -45,44 +41,37 @@ export function LeagueTrends({ index, onBack, onAbout }: Props) {
             League trends
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-stone-500">
-            {seasons[0]}–{seasons.at(-1)}, every team. Pick teams to draw in colour; the rest stay
-            as grey context, with the league median dashed. Hover a season for the value and that
-            team&rsquo;s record.
+            {seasons[0]}–{seasons.at(-1)}. Each line is the median team; the band behind it is the
+            middle half of the league, which says whether the 32 moved together or came apart.
           </p>
         </div>
         <AboutButton onClick={onAbout} tone="muted" />
       </header>
 
-      <div className="flex flex-wrap gap-1.5">
-        {TREND_METRICS.map((option) => (
-          <button
-            key={option.key}
-            onClick={() => setMetricKey(option.key)}
-            aria-pressed={option.key === metricKey}
-            className={`rounded border px-2.5 py-1 text-sm font-semibold ${
-              option.key === metricKey
-                ? 'border-stone-900 bg-stone-900 text-white'
-                : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'
-            }`}
-          >
-            {option.label}
-          </button>
+      {aggressiveness && saidGo && (
+        <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm leading-relaxed text-stone-600 shadow-xs sm:p-5">
+          Across these twelve seasons the median team went from going for it on{' '}
+          <strong className="tnum font-semibold text-stone-900">
+            {(aggressiveness.first.p50 * 100).toFixed(0)}%
+          </strong>{' '}
+          of the 4th downs where the model said go, to{' '}
+          <strong className="tnum font-semibold text-stone-900">
+            {(aggressiveness.last.p50 * 100).toFixed(0)}%
+          </strong>
+          . Over the same stretch, how often the model said go barely moved —{' '}
+          <span className="tnum">{(saidGo.first.p50 * 100).toFixed(0)}%</span> to{' '}
+          <span className="tnum">{(saidGo.last.p50 * 100).toFixed(0)}%</span>. The opportunity was
+          always there; what changed is what teams did with it.
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {LEAGUE_METRICS.map((metric) => (
+          <LeagueTrendPanel key={metric.key} index={index} metric={metric} />
         ))}
       </div>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-3 shadow-xs sm:p-5">
-        <TrendChart seasons={seasons} all={all} selected={chosen} metric={metric} />
-        <p className="mt-2 text-xs leading-relaxed text-stone-500">{metric.note}</p>
-      </section>
-
-      <TeamMultiSelect
-        teams={index.teams}
-        selected={selected}
-        onToggle={toggle}
-        onClear={() => setSelected([])}
-      />
-
-      <AgainstRecord index={index} all={all} selected={chosen} metric={metric} />
+      <AgainstRecord index={index} />
     </main>
   )
 }

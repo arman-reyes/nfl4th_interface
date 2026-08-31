@@ -1,60 +1,58 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { LeagueIndex } from '../../types'
-import type { TrendMetric, TrendSeries } from '../../lib/trends'
+import { LEAGUE_METRICS } from '../../lib/league'
+import type { LeagueMetric } from '../../lib/league'
 import { effectSize, metricAgainstRecord, pearson } from '../../lib/trends'
 import { RecordScatter } from './RecordScatter'
 
 interface Props {
   index: LeagueIndex
-  all: TrendSeries[]
-  selected: TrendSeries[]
-  metric: TrendMetric
 }
+
+/** Metrics worth setting against a record. "How often the model said go" is a
+ *  property of the situations a team faced, so it is left out. */
+const CHOICES = LEAGUE_METRICS.filter((m) => m.key !== 'saidGo')
 
 /**
  * Whether any of this shows up in the standings.
  *
- * The honest answer is no, and it never could — which is a statement about the
- * instrument, not about the decisions. This panel leads with the size of the
- * thing in wins, because win probability points are expected wins by
- * definition and need no correlation to be true, and only then shows the
- * correlation with the arithmetic that explains why it is flat.
+ * The honest answer is that a 17-game record cannot resolve it — which is a
+ * statement about the instrument, not about the decisions. So the panel leads
+ * with the size of the thing in wins, which needs no correlation to be true,
+ * and only then shows the correlation with the arithmetic that explains it.
  */
-export function AgainstRecord({ index, all, selected, metric }: Props) {
+export function AgainstRecord({ index }: Props) {
+  const [metric, setMetric] = useState<LeagueMetric>(
+    CHOICES.find((m) => m.key === 'forfeitedPerGame') ?? CHOICES[0],
+  )
+
   const effect = useMemo(() => effectSize(index), [index])
-  const league = useMemo(() => metricAgainstRecord(all, metric), [all, metric])
-  const r = useMemo(() => pearson(league), [league])
-  // Decision quality alone cannot move r past the ceiling. A correlation
-  // bigger than that is measuring something else — which is the interesting
-  // case, not the embarrassing one.
+  const pairs = useMemo(() => metricAgainstRecord(index, metric), [index, metric])
+  const r = useMemo(() => pearson(pairs), [pairs])
+  // Decision quality alone cannot move r past the ceiling. A correlation bigger
+  // than that is measuring something else, which is the interesting case.
   const exceedsCeiling = Math.abs(r ?? 0) > effect.ceiling
 
   return (
     <section className="space-y-4 rounded-lg border border-stone-200 bg-white p-3 shadow-xs sm:p-5">
-      <div>
-        <h3 className="text-xs font-bold tracking-[0.18em] text-stone-500 uppercase">
-          Does it show up in the standings?
-        </h3>
+      <h3 className="text-xs font-bold tracking-[0.18em] text-stone-500 uppercase">
+        Does it show up in the standings?
+      </h3>
 
-        <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat
-            value={effect.meanWins.toFixed(2)}
-            unit="wins"
-            label="Given up per team-season, on average"
-          />
-          <Stat
-            value={effect.maxWins.toFixed(2)}
-            unit="wins"
-            label="Worst team-season in the data"
-          />
-          <Stat
-            value={r === null ? '—' : r.toFixed(2)}
-            unit="r"
-            label={`${metric.label} against record, n = ${effect.n}`}
-            muted
-          />
-        </dl>
-      </div>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Stat
+          value={effect.meanWins.toFixed(2)}
+          unit="wins"
+          label="Given up per team-season, on average"
+        />
+        <Stat value={effect.maxWins.toFixed(2)} unit="wins" label="Worst team-season in the data" />
+        <Stat
+          value={r === null ? '—' : r.toFixed(2)}
+          unit="r"
+          label={`Against record, n = ${effect.n} team-seasons`}
+          muted
+        />
+      </dl>
 
       <div className="space-y-2 text-sm leading-relaxed text-stone-600">
         <p>
@@ -77,8 +75,8 @@ export function AgainstRecord({ index, all, selected, metric }: Props) {
           {exceedsCeiling ? (
             <>
               Which makes the{' '}
-              <span className="tnum font-semibold text-stone-900">{(r ?? 0).toFixed(2)}</span> on the
-              chart the interesting part: it is bigger than decision quality could produce, so it is
+              <span className="tnum font-semibold text-stone-900">{(r ?? 0).toFixed(2)}</span> below
+              the interesting part: it is bigger than decision quality could produce, so it is
               mostly measuring the other direction. Teams that spend a season behind go for it more,
               and teams that spend a season behind lose. The chart is picking up the scoreboard, not
               the coaching.
@@ -104,7 +102,24 @@ export function AgainstRecord({ index, all, selected, metric }: Props) {
         </p>
       </div>
 
-      <RecordScatter all={all} selected={selected} metric={metric} />
+      <div className="flex flex-wrap gap-1.5">
+        {CHOICES.map((choice) => (
+          <button
+            key={choice.key}
+            onClick={() => setMetric(choice)}
+            aria-pressed={choice.key === metric.key}
+            className={`rounded border px-2 py-1 text-xs font-semibold ${
+              choice.key === metric.key
+                ? 'border-stone-900 bg-stone-900 text-white'
+                : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'
+            }`}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+
+      <RecordScatter pairs={pairs} metric={metric} />
     </section>
   )
 }
