@@ -1,5 +1,6 @@
 import type { Choice, QuizPlay } from '../types'
 import { modelChoice, wpOf } from './decision'
+import { playKey } from './filters'
 
 /**
  * A round of the quiz: ten real 4th downs, the reader's call on each, and how
@@ -49,19 +50,28 @@ function shuffle<T>(items: T[], random: () => number): T[] {
 
 /**
  * Ten questions drawn from the pool, mixed so the model wants to go on four of
- * them. Falls back to whatever the pool can supply if it is short of either.
+ * them.
+ *
+ * `seen` holds the plays already asked this session. Rounds accumulate into one
+ * sample, so a repeated situation would be counted twice — and noticed. If the
+ * unseen pool cannot fill a round, it falls back to the whole pool rather than
+ * dealing short.
  */
 export function pickQuestions(
   pool: QuizPlay[],
   random: () => number = Math.random,
   count = QUESTIONS_PER_ROUND,
+  seen: ReadonlySet<string> = new Set(),
 ): QuizPlay[] {
+  const unseen = pool.filter((p) => !seen.has(playKey(p)))
+  const source = unseen.length >= count ? unseen : pool
+
   const goes = shuffle(
-    pool.filter((p) => modelChoice(p) === 'go'),
+    source.filter((p) => modelChoice(p) === 'go'),
     random,
   )
   const others = shuffle(
-    pool.filter((p) => modelChoice(p) !== 'go'),
+    source.filter((p) => modelChoice(p) !== 'go'),
     random,
   )
 

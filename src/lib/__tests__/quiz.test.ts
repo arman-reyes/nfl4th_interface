@@ -169,3 +169,48 @@ describe('scoring an option the model cannot price', () => {
     expect(score.goRecommended).toBe(1)
   })
 })
+
+describe('building a sample across rounds', () => {
+  const pool = [
+    ...Array.from({ length: 30 }, (_, i) => goPlay(i)),
+    ...Array.from({ length: 30 }, (_, i) => puntPlay(100 + i)),
+  ]
+
+  it('does not ask again about a play already seen', () => {
+    const first = pickQuestions(pool, seededRandom(1))
+    const seen = new Set(first.map((p) => `${p.game_id}:${p.play_id}`))
+    const second = pickQuestions(pool, seededRandom(2), 10, seen)
+    for (const play of second) {
+      expect(seen.has(`${play.game_id}:${play.play_id}`)).toBe(false)
+    }
+  })
+
+  it('still keeps the four-go mix in a later round', () => {
+    const first = pickQuestions(pool, seededRandom(1))
+    const seen = new Set(first.map((p) => `${p.game_id}:${p.play_id}`))
+    const second = pickQuestions(pool, seededRandom(2), 10, seen)
+    expect(second.filter((p) => modelChoice(p) === 'go')).toHaveLength(4)
+  })
+
+  it('falls back to the whole pool rather than dealing a short round', () => {
+    const seen = new Set(pool.map((p) => `${p.game_id}:${p.play_id}`))
+    expect(pickQuestions(pool, seededRandom(3), 10, seen)).toHaveLength(10)
+  })
+
+  it('scores the rounds together', () => {
+    const roundOne: Answer[] = [
+      { play: goPlay(1, 4), choice: 'go' },
+      { play: goPlay(2, 4), choice: 'punt' },
+    ]
+    const roundTwo: Answer[] = [
+      { play: goPlay(3, 4), choice: 'go' },
+      { play: goPlay(4, 4), choice: 'go' },
+    ]
+    const combined = scoreRound([...roundOne, ...roundTwo])
+    expect(combined.decisions).toBe(4)
+    expect(combined.goRecommended).toBe(4)
+    expect(combined.goTaken).toBe(3)
+    expect(combined.aggressiveness).toBeCloseTo(0.75, 10)
+    expect(combined.forfeited).toBeCloseTo(4, 6)
+  })
+})

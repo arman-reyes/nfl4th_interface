@@ -7,7 +7,11 @@ import { StatTile } from '../summary/StatTile'
 import { DecisionMatrix } from '../summary/DecisionMatrix'
 
 interface Props {
-  answers: Answer[]
+  /** Every call this session, across all rounds. */
+  all: Answer[]
+  /** Just the round that finished. */
+  round: Answer[]
+  rounds: number
   index: LeagueIndex
   onAgain: () => void
   onBack: () => void
@@ -23,8 +27,15 @@ function leagueMedian(index: LeagueIndex, pick: (abbr: string) => number | null)
   return values[Math.floor(values.length / 2)]
 }
 
-export function QuizResults({ answers, index, onAgain, onBack }: Props) {
-  const score = useMemo(() => scoreRound(answers), [answers])
+/**
+ * The reader's record, over every round they have played.
+ *
+ * Cumulative on purpose: ten calls is far too few to say anything about anyone,
+ * and the honest way to make the numbers mean more is to answer more of them.
+ */
+export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Props) {
+  const score = useMemo(() => scoreRound(all), [all])
+  const lastRound = useMemo(() => scoreRound(round), [round])
 
   const benchmarks = useMemo(() => {
     const allSeasons = (abbr: string) =>
@@ -38,17 +49,27 @@ export function QuizResults({ answers, index, onAgain, onBack }: Props) {
   // The matrix renders from the plays plus a lookup of what the reader called.
   const calls = useMemo(() => {
     const map = new Map<PlayFacts, Choice | null>()
-    for (const answer of answers) map.set(answer.play, answer.choice)
+    for (const answer of all) map.set(answer.play, answer.choice)
     return map
-  }, [answers])
+  }, [all])
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-          Your ten calls
+          {rounds === 1 ? 'Your ten calls' : `Your ${all.length} calls`}
         </h2>
         <p className="mt-1 text-sm text-stone-500">
+          {rounds > 1 && (
+            <>
+              Across {rounds} rounds, scored together.{' '}
+              {lastRound.decisions > 0 && (
+                <>
+                  This round: {lastRound.matched} of {lastRound.decisions} matched.{' '}
+                </>
+              )}
+            </>
+          )}
           Scored the same way every coaching staff in this tool is scored.
           {score.timedOut > 0 &&
             ` ${score.timedOut} ran out of time and ${score.timedOut === 1 ? 'is' : 'are'} left out, the way a penalty would be.`}
@@ -77,7 +98,7 @@ export function QuizResults({ answers, index, onAgain, onBack }: Props) {
         <StatTile
           label="Given up"
           value={points(score.forfeited)}
-          note="win prob points, all ten"
+          note={`win prob points across ${score.decisions} calls`}
         />
         <StatTile
           label="Per call"
@@ -87,7 +108,7 @@ export function QuizResults({ answers, index, onAgain, onBack }: Props) {
       </dl>
 
       <DecisionMatrix
-        plays={answers.map((a) => a.play)}
+        plays={all.map((a) => a.play)}
         choiceOf={(play) => calls.get(play) ?? null}
         heading="Your calls against the model"
       />
@@ -97,20 +118,28 @@ export function QuizResults({ answers, index, onAgain, onBack }: Props) {
           <>
             {score.aggressiveness > benchmarks.aggressiveness ? (
               <>
-                You went for it more often than the median NFL staff has over the last twelve
+                You have gone for it more often than the median NFL staff has over the last twelve
                 seasons.{' '}
               </>
             ) : (
               <>
-                You went for it less often than the median NFL staff has over the last twelve
-                seasons — which is the usual result, and the reason the league has spent a decade
-                moving.{' '}
+                You have gone for it less often than the median NFL staff has over the last twelve
+                seasons — the usual result, and the reason the league has spent a decade moving.{' '}
               </>
             )}
           </>
         )}
-        Ten calls is a small sample and this is a game, not a grade. What it does show is the shape
-        of the mistake: almost everyone punts more than the model would.
+        {score.decisions < 30 ? (
+          <>
+            {score.decisions} calls is still a small sample. Another round or two makes these
+            numbers worth something — a full NFL season is about 130.
+          </>
+        ) : (
+          <>
+            {score.decisions} calls is getting close to a real sample; an NFL team faces about 130
+            in a season.
+          </>
+        )}
       </p>
 
       <div className="flex flex-wrap gap-2">

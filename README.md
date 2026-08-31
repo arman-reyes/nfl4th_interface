@@ -158,6 +158,17 @@ Four decisions shape it:
 - **Running out of time is not a call.** It is excluded the way a penalty is, and
   the results say how many.
 
+Rounds accumulate. "Ten more" adds to the record rather than restarting it, so a
+reader can build a sample worth reading — ten calls says very little, and the
+results say so until the count gets closer to the ~130 an NFL team faces in a
+season. Questions already asked this session are excluded from later draws, since
+a repeat would be counted twice.
+
+The round's state is one object rather than separate answer and pending values,
+so answering and advancing are atomic. Two clicks landing in the same tick — a
+double-click on Next, or a click racing the clock — otherwise both read the same
+stale value and record a call for a question the reader never saw.
+
 ## About dialog
 
 The question-mark button, top right on both the picker and the team banner,

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Choice, LeagueIndex } from '../types'
 import { useQuizPool } from '../hooks/useTeamData'
+import { playKey } from '../lib/filters'
 import type { Answer } from '../lib/quiz'
 import {
   pickQuestions,
@@ -19,43 +20,69 @@ interface Props {
   onAbout: () => void
 }
 
+interface RoundState {
+  answers: Answer[]
+  /** The call awaiting its reveal; undefined while the question is open. */
+  pending: Choice | null | undefined
+}
+
 /**
- * Ten real 4th downs, put to the reader with a clock running.
+ * Real 4th downs, put to the reader with a clock running.
  *
- * Every situation is one a staff actually faced, and it is scored exactly the
- * way that staff is scored elsewhere in this tool — so the numbers at the end
- * can be read straight against a coaching staff's.
+ * Rounds accumulate into one sample: ten calls says very little about anyone,
+ * and asking for ten more should build the record rather than restart it. Every
+ * situation is one a staff actually faced, scored exactly the way that staff is
+ * scored elsewhere, so the numbers at the end read straight against theirs.
  */
 export function QuizPage({ index, onBack, onAbout }: Props) {
   const pool = useQuizPool()
   const [round, setRound] = useState(0)
   // Fresh questions on every visit, stable within a round.
   const [seed] = useState(() => Math.floor(Math.random() * 2 ** 31))
-  const [answers, setAnswers] = useState<Answer[]>([])
-  const [pending, setPending] = useState<Choice | null | undefined>(undefined)
+  /** Every call from rounds already finished. */
+  const [history, setHistory] = useState<Answer[]>([])
+  /**
+   * The round's calls and the one awaiting its reveal, held together.
+   *
+   * One object rather than two pieces of state so that answering and advancing
+   * are single atomic transitions. Two clicks landing in the same tick — a
+   * double-click on Next, or a click racing the clock running out — would
+   * otherwise both read the same stale value and record a call for a question
+   * the reader never saw.
+   */
+  const [state, setState] = useState<RoundState>({ answers: [], pending: undefined })
+  const { answers, pending } = state
 
-  // Bumping `round` reseeds, which draws ten fresh questions.
+  const seen = useMemo(() => new Set(history.map((answer) => playKey(answer.play))), [history])
+
+  // Bumping `round` reseeds, which draws a fresh set the reader has not seen.
   const questions = useMemo(
-    () => (pool.data ? pickQuestions(pool.data, seededRandom(seed + round)) : []),
-    [pool.data, seed, round],
+    () =>
+      pool.data
+        ? pickQuestions(pool.data, seededRandom(seed + round), QUESTIONS_PER_ROUND, seen)
+        : [],
+    [pool.data, seed, round, seen],
   )
 
   const current = questions[answers.length] ?? null
-  const done = questions.length > 0 && answers.length === questions.length && pending === undefined
+  const done = questions.length > 0 && answers.length >= questions.length && pending === undefined
 
   const answer = useCallback((choice: Choice | null) => {
-    setPending(choice)
+    setState((s) => (s.pending === undefined ? { ...s, pending: choice } : s))
   }, [])
 
   function next() {
-    if (pending === undefined || !current) return
-    setAnswers((prev) => [...prev, { play: current, choice: pending }])
-    setPending(undefined)
+    setState((s) => {
+      if (s.pending === undefined) return s
+      const play = questions[s.answers.length]
+      if (!play) return { ...s, pending: undefined }
+      return { answers: [...s.answers, { play, choice: s.pending }], pending: undefined }
+    })
   }
 
   function again() {
-    setAnswers([])
-    setPending(undefined)
+    setHistory((prev) => [...prev, ...answers])
+    setState({ answers: [], pending: undefined })
     setRound((r) => r + 1)
   }
 
@@ -75,18 +102,24 @@ export function QuizPage({ index, onBack, onAbout }: Props) {
           <p className="mt-1 text-sm text-stone-500">
             {QUESTIONS_PER_ROUND} real 4th downs, {SECONDS_PER_QUESTION} seconds each. Go, kick or
             punt.
+            {history.length > 0 && ` Round ${round + 1} — ${history.length} calls behind you.`}
           </p>
         </div>
         <AboutButton onClick={onAbout} tone="muted" />
       </header>
 
       {pool.loading && <p className="py-16 text-center text-sm text-stone-500">Loading…</p>}
-      {pool.error && (
-        <p className="py-16 text-center text-sm text-red-700">{pool.error.message}</p>
-      )}
+      {pool.error && <p className="py-16 text-center text-sm text-red-700">{pool.error.message}</p>}
 
       {done ? (
-        <QuizResults answers={answers} index={index} onAgain={again} onBack={onBack} />
+        <QuizResults
+          all={[...history, ...answers]}
+          round={answers}
+          rounds={round + 1}
+          index={index}
+          onAgain={again}
+          onBack={onBack}
+        />
       ) : current ? (
         pending === undefined ? (
           <QuizQuestion

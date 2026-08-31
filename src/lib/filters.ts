@@ -1,4 +1,4 @@
-import type { Play } from '../types'
+import type { Play, PlayFacts } from '../types'
 
 /**
  * The drill-down: team, then season, then week, then quarter, then the
@@ -16,7 +16,7 @@ export interface PlayFilter {
 }
 
 /** Stable identity for a play. game_id alone repeats across a team's history. */
-export function playKey(play: Play): string {
+export function playKey(play: PlayFacts): string {
   return `${play.game_id}:${play.play_id}`
 }
 
