@@ -1,4 +1,11 @@
-import type { LeagueIndex, Play, QuizPlay, TeamAbbr } from '../types'
+import type {
+  GarbageSeasons,
+  GarbageTimeFile,
+  LeagueIndex,
+  Play,
+  QuizPlay,
+  TeamAbbr,
+} from '../types'
 
 /**
  * The only place the app talks to storage.
@@ -15,6 +22,10 @@ export interface DataSource {
   loadTeamPlays(abbr: TeamAbbr): Promise<Play[]>
   /** A sample of 4th downs for the quiz, without their descriptions. */
   loadQuizPool(): Promise<QuizPlay[]>
+  /** Seasons the garbage-time pipeline has published. Loaded once. */
+  loadGarbageSeasons(): Promise<GarbageSeasons>
+  /** One season of fantasy production binned by win probability. */
+  loadGarbageTime(season: number): Promise<GarbageTimeFile>
 }
 
 const BASE = `${import.meta.env.BASE_URL}data`
@@ -54,10 +65,20 @@ const fetchTeam = memoize<TeamAbbr, Play[]>((abbr) =>
 
 const fetchQuiz = memoize<'quiz', QuizPlay[]>(() => getJson<QuizPlay[]>(`${BASE}/quiz.json`))
 
+const fetchGarbageSeasons = memoize<'seasons', GarbageSeasons>(() =>
+  getJson<GarbageSeasons>(`${BASE}/garbage/seasons.json`),
+)
+
+const fetchGarbage = memoize<number, GarbageTimeFile>((season) =>
+  getJson<GarbageTimeFile>(`${BASE}/garbage/${season}.json`),
+)
+
 export const staticDataSource: DataSource = {
   loadIndex: () => fetchIndex('index'),
   loadTeamPlays: (abbr) => fetchTeam(abbr),
   loadQuizPool: () => fetchQuiz('quiz'),
+  loadGarbageSeasons: () => fetchGarbageSeasons('seasons'),
+  loadGarbageTime: (season) => fetchGarbage(season),
 }
 
 export const dataSource: DataSource = staticDataSource

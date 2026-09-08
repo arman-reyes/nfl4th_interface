@@ -116,7 +116,7 @@ const ENTRIES: Entry[] = [
     body: (
       <>
         <Code>home_score</Code> and <Code>away_score</Code> are the game&rsquo;s final score,
-        restated from the offence&rsquo;s side. Shown as W/L/T from the viewed team&rsquo;s point of
+        restated from the offense&rsquo;s side. Shown as W/L/T from the viewed team&rsquo;s point of
         view.
       </>
     ),

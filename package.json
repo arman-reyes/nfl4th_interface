@@ -11,7 +11,8 @@
     "data:fixture": "node scripts/make-fixture.mjs && tsx scripts/build-index.ts --fixture",
     "data:index": "tsx scripts/build-index.ts",
     "test": "vitest run",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "data:garbage:check": "tsx scripts/check-garbage.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

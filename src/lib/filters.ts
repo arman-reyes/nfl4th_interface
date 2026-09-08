@@ -132,7 +132,7 @@ export interface GameResult {
 
 /**
  * The final score from the viewed team's side. Every play in a team file has
- * that team as `posteam`, so the offence's columns are already the right way
+ * that team as `posteam`, so the offense's columns are already the right way
  * round.
  */
 export function gameResult(play: Play): GameResult | null {
