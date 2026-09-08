@@ -19,7 +19,7 @@
  * |---|---|---|---|---|---|
  * | 1-4 | `#a85f57` | `#417f68` | 4.53 | 16.2 | 4.7 |
  * | 5-11 | `#c7483a` | `#258260` | 4.55 | 24.9 | 8.3 |
- * | 12+ | `#df2712` | `#0b8458` | 4.53 | 11.0 | 11.0 |
+ * | 12+ | `#df2712` | `#0b8458` | 4.53 | 31.2 | 11.0 |
  *
  * The faintest step is deliberately at the edge of the palette's rules and no
  * further. Below about 32% saturation the two tints stop being separable even
