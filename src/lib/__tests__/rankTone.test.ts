@@ -26,20 +26,40 @@ describe('rankTone', () => {
     }
   })
 
-  it('darkens as the move gets bigger, and mirrors across the sign', () => {
+  it('gains colour as the move gets bigger, at a fixed lightness', () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    // how far the colour is from grey; the axis the ramp actually moves along
+    const chroma = (hex: string) => {
+      const c = rgb(hex)
+      return Math.max(...c) - Math.min(...c)
+    }
     const luminance = (hex: string) =>
-      [1, 3, 5]
-        .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      rgb(hex)
         .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
         .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0)
+
     for (const sign of [1, -1]) {
-      const steps = [1, 6, 20].map((m) => luminance(rankTone(m * sign).color!))
-      expect(steps[0]).toBeGreaterThan(steps[1])
-      expect(steps[1]).toBeGreaterThan(steps[2])
+      const steps = [1, 6, 20].map((m) => rankTone(m * sign).color!)
+      expect(chroma(steps[1])).toBeGreaterThan(chroma(steps[0]))
+      expect(chroma(steps[2])).toBeGreaterThan(chroma(steps[1]))
+      // lightness is pinned by the contrast floor, so it must barely move —
+      // this is what keeps every step legal as 11px text
+      const lums = steps.map(luminance)
+      expect(Math.max(...lums) - Math.min(...lums)).toBeLessThan(0.02)
     }
     // the two arms step at the same magnitudes
     expect(new Set([1, 6, 20].map((m) => rankTone(m).color)).size).toBe(3)
     expect(new Set([1, 6, 20].map((m) => rankTone(-m).color)).size).toBe(3)
+  })
+
+  it('keeps even the faintest step visibly tinted rather than grey', () => {
+    const chroma = (hex: string) => {
+      const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      return Math.max(...c) - Math.min(...c)
+    }
+    // a neutral grey has zero chroma; the softest step still carries its hue
+    expect(chroma(rankTone(1).color!)).toBeGreaterThan(0.15)
+    expect(chroma(rankTone(-1).color!)).toBeGreaterThan(0.15)
   })
 
   it('steps at the measured cutoffs, not somewhere near them', () => {

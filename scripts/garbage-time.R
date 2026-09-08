@@ -26,6 +26,7 @@
 library(nflreadr)   # 1.5.1
 library(dplyr)
 library(purrr)
+library(tidyr)
 library(jsonlite)
 
 # 1999 is nflfastR's floor for play-by-play carrying win probability. Older
@@ -62,7 +63,13 @@ TOL_SHARE <- 0.03
 STATS <- c("pass_att", "pass_cmp", "pass_yds", "pass_td", "int",
            "rush_att", "rush_yds", "rush_td",
            "tgt", "rec", "rec_yds", "rec_td",
-           "fum_lost", "two_pt_pass", "two_pt_score", "st_td", "plays")
+           "fum_lost", "two_pt_pass", "two_pt_score", "st_td", "plays", "snaps")
+
+# Per-play participation, which is what makes a real snap count possible, only
+# exists from 2016. Older seasons ship snaps of zero and a `has_snaps` flag of
+# false, and the interface asks a different question of them rather than
+# printing a share of nothing.
+FIRST_PARTICIPATION <- 2016
 
 # Plays that can produce a fantasy stat. Gating on play_type rather than on
 # pass_attempt/rush_attempt is deliberate and load-bearing: nflfastR leaves the
@@ -126,6 +133,47 @@ season_pbp <- function(season) {
     return(d)
   }
   nflreadr::load_pbp(season) |> filter(season_type == "REG")
+}
+
+season_participation <- function(season) {
+  if (season < FIRST_PARTICIPATION) return(NULL)
+  cache <- Sys.getenv("GT_CACHE", "")
+  f <- if (nzchar(cache)) file.path(cache, sprintf("part_%d.rds", season)) else ""
+  if (nzchar(f) && file.exists(f)) return(readRDS(f))
+  d <- tryCatch(
+    nflreadr::load_participation(season) |>
+      select(game_id = nflverse_game_id, play_id, offense_players),
+    error = function(e) NULL
+  )
+  if (!is.null(d) && nzchar(f)) {
+    dir.create(cache, recursive = TRUE, showWarnings = FALSE)
+    saveRDS(d, f)
+  }
+  d
+}
+
+# Snaps played, per player per bin.
+#
+# The only honest snap count available: participation lists the eleven players
+# on the field for each play, so a player is credited whether or not the ball
+# came near him. Everything else in this file counts touches and targets, which
+# is a different question — a receiver can play a whole quarter of garbage time
+# and be thrown at once.
+snap_rows <- function(pbp, season) {
+  part <- season_participation(season)
+  empty <- tibble(id = character(), team = character(), bin = integer(), snaps = numeric())
+  if (is.null(part)) return(empty)
+  joined <- pbp |>
+    filter(!is.na(ptype)) |>
+    select(game_id, play_id, team = posteam, bin) |>
+    inner_join(part, by = c("game_id", "play_id")) |>
+    filter(!is.na(offense_players), offense_players != "")
+  if (nrow(joined) == 0) return(empty)
+  joined |>
+    mutate(id = strsplit(offense_players, ";")) |>
+    tidyr::unnest(id) |>
+    filter(!is.na(id), id != "") |>
+    count(id, team, bin, name = "snaps")
 }
 
 # Every fantasy event in a season, as (player, bin, counting stats).
@@ -300,7 +348,10 @@ build_season <- function(season) {
   ps <- player_stats(season)
   # Every event carries the offense it happened for, so the same attribution
   # produces the player rows and the team rows and the two cannot disagree.
-  ev_team <- bind_rows(events(pbp), st_rows(pbp, ps)) |>
+  snaps <- snap_rows(pbp, season)
+  message("  ", nrow(snaps), " player-bin snap rows",
+          if (nrow(snaps) == 0) " (no participation data this far back)" else "")
+  ev_team <- bind_rows(events(pbp), st_rows(pbp, ps), snaps) |>
     group_by(id, team, bin) |> summarise(across(everything(), \(x) sum(z(x))), .groups = "drop")
   ev <- ev_team |> group_by(id, bin) |>
     summarise(across(all_of(STATS), sum), .groups = "drop")
@@ -395,6 +446,7 @@ build_season <- function(season) {
     season = season,
     through_week = max(weeks),
     complete = max(weeks) >= 17,
+    has_snaps = nrow(snaps) > 0,
     bins = bin_table(),
     clean_bin = CLEAN_BIN,
     margin = MARGIN,

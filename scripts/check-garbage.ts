@@ -90,6 +90,40 @@ for (const season of seasons) {
     continue
   }
 
+  // Snaps come from nflverse participation, which is not perfect: on a handful
+  // of plays it lists the wrong quarterback's personnel grouping, so a player
+  // can be charged with more touches in a band than snaps. Reported rather than
+  // failed - it is upstream data, it is rare, and hiding it would be worse than
+  // saying how rare.
+  if (file.has_snaps) {
+    const snapsAt = file.stats.indexOf('snaps')
+    const playsAt = file.stats.indexOf('plays')
+    let bands = 0
+    let short = 0
+    for (const player of file.players) {
+      const agg = new Map<string, { plays: number; snaps: number }>()
+      for (const [bin, line] of player.bins) {
+        const side = file.bins[bin]?.side ?? 'clean'
+        const at = agg.get(side) ?? { plays: 0, snaps: 0 }
+        at.plays += line[playsAt] ?? 0
+        at.snaps += line[snapsAt] ?? 0
+        agg.set(side, at)
+      }
+      for (const at of agg.values()) {
+        if (at.plays === 0 && at.snaps === 0) continue
+        bands += 1
+        if (at.plays > at.snaps) short += 1
+      }
+    }
+    if (short > 0) {
+      process.stdout.write(
+        `  participation gaps: ${short} of ${bands} player-bands ` +
+          `(${((short / bands) * 100).toFixed(2)}%) show more touches than snaps
+`,
+      )
+    }
+  }
+
   const shares = leagueShares(file, THRESHOLD)
   const rate = shares.trailing + shares.leading
   process.stdout.write(

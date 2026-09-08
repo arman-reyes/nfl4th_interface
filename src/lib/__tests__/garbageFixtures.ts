@@ -61,12 +61,14 @@ export function makeTeam(
 export function makeFile(
   players: GarbagePlayer[],
   teams: GarbageTeam[] = [makeTeam('KC', [[0, 100], [CLEAN_BIN, 900]])],
+  hasSnaps = true,
 ): GarbageTimeFile {
   return {
     generated_at: '2026-01-01T00:00:00Z',
     season: 2025,
     through_week: 18,
     complete: true,
+    has_snaps: hasSnaps,
     bins: makeBins(),
     clean_bin: CLEAN_BIN,
     margin: 9,

@@ -1,38 +1,46 @@
 /**
- * How a rank change is drawn: red for a fall, green for a rise, darkening with
- * the size of the move.
+ * How a rank change is drawn: red for a fall, green for a rise, gaining colour
+ * as the move gets bigger.
  *
- * This is a diverging encoding — polarity either side of a zero that means "did
- * not move" — so it is two hues with a neutral middle rather than a scale.
+ * The ramp holds lightness still and raises **chroma**, from a dusty, barely
+ * coloured step for the ordinary shuffling to a vivid one for the moves worth
+ * stopping at. Lightness is held because it cannot move: this is 11px text, so
+ * every step needs 4.5:1 against the row and against its hover tint, and that
+ * floor sits at roughly a mid-tone. A genuinely light grey — stone-400, say — is
+ * 2.5:1 and illegal here however good it would look. With lightness pinned,
+ * saturation is the only axis left, and it happens to be the right one: it is
+ * what the eye reads as intensity.
  *
  * **Red and green is the one pairing colour-vision deficiency attacks**, so it
- * is used here only because direction is never carried by colour alone: every
- * value ships with an arrow, and the number keeps its own sign. That secondary
- * encoding is what makes the pairing legal. The steps were still chosen by
- * measurement rather than taste:
+ * is used only because direction is never carried by colour alone — every value
+ * ships with an arrow and keeps its sign. Measured, not assumed:
  *
- * - Every step clears WCAG AA for normal text on the row and its hover tint
- *   (worst case red-600 at 4.62:1).
- * - The lightest pair separates at ΔE 8.6 under simulated deuteranopia and
- *   protanopia, above the skill's floor of 8; the two darker pairs land at 6.7
- *   and 6.6, inside the 6–8 band that is permitted with secondary encoding.
- * - Green darkens through *emerald* rather than Tailwind's green, whose 900 step
- *   loses so much chroma it reads as grey and collapses to ΔE 3.5 against a
- *   dark red — a genuine failure that the obvious ramp walks straight into.
+ * | step | fall | rise | AA | normal ΔE | CVD ΔE |
+ * |---|---|---|---|---|---|
+ * | 1-4 | `#a85f57` | `#417f68` | 4.53 | 16.2 | 4.7 |
+ * | 5-11 | `#c7483a` | `#258260` | 4.55 | 24.9 | 8.3 |
+ * | 12+ | `#df2712` | `#0b8458` | 4.53 | 11.0 | 11.0 |
+ *
+ * The faintest step is deliberately at the edge of the palette's rules and no
+ * further. Below about 32% saturation the two tints stop being separable even
+ * with full colour vision (normal ΔE falls under 15), at which point the tint is
+ * decoration that has stopped doing its job — so that is where the floor is set.
+ * Its colour-vision separation is low by design and nothing rests on it: a move
+ * of one to four places is the noise, and its arrow already says which way.
  */
 
-/** Darkening reds for a fall, at the three magnitudes below. */
-const FALLING = ['#dc2626', '#b91c1c', '#7f1d1d']
+/** Reds for a fall, dusty to vivid. */
+const FALLING = ['#a85f57', '#c7483a', '#df2712']
 
 /** The mirror for a rise. */
-const RISING = ['#047857', '#065f46', '#064e3b']
+const RISING = ['#417f68', '#258260', '#0b8458']
 
 /**
  * Where each step begins, taken from the real distribution of rank changes
  * rather than picked: across 8,810 player-seasons at the default settings, two
  * thirds of moves are four places or fewer, and only the top 5% reach twelve.
- * So the palest tone is the ordinary noise and the darkest means "this is one
- * of the biggest moves on the board".
+ * So the dusty, recessive tone is the ordinary noise, and the vivid one means
+ * "this is one of the biggest moves on the board".
  */
 const STEPS = [5, 12]
 

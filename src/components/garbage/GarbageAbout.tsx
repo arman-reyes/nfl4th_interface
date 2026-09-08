@@ -127,6 +127,15 @@ export function GarbageAbout({ open, file, seasons, onClose }: Props) {
             cannot rebuild those totals is left out rather than published — which is why{' '}
             {seasons.length} seasons are here and 1999&ndash;2001 and 2011 are not.
           </P>
+          <P>
+            <Strong>Snaps</Strong> come from nflverse participation, which lists the eleven
+            offensive players on each play, so a receiver who ran a route and was never looked at
+            still counts as having been there. It exists from 2016 only; before that the panel
+            falls back to touches and targets and says so. It is close to but not perfectly clean —
+            the passer is listed on 99.8% of pass plays, and on about 0.1% of player-bands a player
+            is charged with more touches than snaps, almost always a quarterback on a team that
+            changed starters.
+          </P>
           {file && (
             <P className="text-xs text-stone-400">
               {file.season} data built{' '}

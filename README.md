@@ -334,24 +334,38 @@ phone gets **its own Sort by control** rather than losing the ability to sort.
 Its labels are fuller than the column headers — a header can be terse because it
 sits above its own numbers, and "Points from" means nothing in a dropdown.
 
-**Rank changes are red for a fall and green for a rise**, darkening with the size
-of the move — a diverging encoding around a zero that means "did not move". The
-headline mover tiles use the same ramp, and derive their arrow from the sign
-rather than hard-coding one, so with nothing removed they read "—" instead of
-claiming a fall of zero.
+**Rank changes are red for a fall and green for a rise**, gaining colour as the
+move gets bigger: a dusty, barely tinted step for the ordinary shuffling and a
+vivid one for the moves worth stopping at. The headline mover tiles use the same
+ramp, and derive their arrow from the sign rather than hard-coding one, so with
+nothing removed they read "—" instead of claiming a fall of zero.
+
+The ramp holds **lightness still and raises chroma**, because lightness cannot
+move: this is 11px text, so every step needs 4.5:1 against the row and its hover
+tint, and that floor sits at roughly a mid-tone. A genuinely light grey —
+`stone-400` — is 2.5:1 and illegal here however good it would look. With
+lightness pinned, saturation is the only axis left, and it is the one the eye
+reads as intensity anyway.
 
 Red and green is the one pairing colour-vision deficiency attacks, so it is used
-here only because **direction is never carried by colour alone**: every value
-ships with an arrow and keeps its sign. The steps in
-`src/components/garbage/rankTone.ts` were measured rather than chosen — every one
-clears WCAG AA for normal text on the row and its hover tint, the lightest pair
-separates at ΔE 8.6 under simulated deuteranopia and protanopia, and the two
-darker pairs sit at 6.7 and 6.6, inside the band that is permissible with a
-secondary encoding. Green darkens through *emerald* because Tailwind's green-900
-loses enough chroma to read as grey and collapses to ΔE 3.5 against a dark red —
-the obvious ramp walks straight into that. The three magnitude steps come from
-the real distribution: across 8,810 player-seasons two thirds of moves are four
-places or fewer, and only the top 5% reach twelve.
+only because **direction is never carried by colour alone**: every value ships
+with an arrow and keeps its sign. The steps in
+`src/components/garbage/rankTone.ts` were measured, not chosen:
+
+| Move | Fall | Rise | AA (hover) | Normal-vision ΔE | CVD ΔE |
+|---|---|---|---|---|---|
+| 1–4 | `#a85f57` | `#417f68` | 4.53 | 16.2 | 4.7 |
+| 5–11 | `#c7483a` | `#258260` | 4.55 | 24.9 | 8.3 |
+| 12+ | `#df2712` | `#0b8458` | 4.53 | 31.2 | 11.0 |
+
+The faintest step sits at the edge of the palette rules and no further: below
+about 32% saturation the two tints stop being separable even with full colour
+vision (normal ΔE drops under 15), at which point the tint is decoration that has
+stopped doing its job. Its colour-vision separation is low by design and nothing
+rests on it — a move of one to four places is the noise, and the arrow already
+says which way. The three magnitude steps come from the real distribution:
+across 8,810 player-seasons two thirds of moves are four places or fewer, and
+only the top 5% reach twelve.
 
 The **rank shown against a row follows whichever ranking is being sorted on**.
 Pinned to the actual rank, sorting by Remaining printed a scrambled column — 3,
@@ -386,12 +400,62 @@ Three further decisions shape the page:
   settings the controls allow.
 
 Opening a row shows what the removals actually took: his counting stats actual
-against remaining, and a line putting his team's garbage-time exposure next to
-his own. There is deliberately **no chart in the panel** — the row that opened
-it already draws the three bands, as a stacked bar in the table and as a
-labelled bar on a card, so a donut underneath would be the same split a second
-time a few pixels below the first. What a reader cannot get from the row is
-which catches, yards and touchdowns came out, which is what the panel is for.
+against remaining, and beside them **points by game state** — what his season was
+worth in each band, in points, per game, his share of it, and **his team's share
+of the same state, side by side**.
+
+The gap between those two is the whole question. A third of his points earned on
+a fifth of his snaps is a player feasting on a state; the same third earned on a
+third of his snaps is a player who was simply out there. Both are shares of his
+own season, so they read against each other directly.
+
+**Snaps are real snaps.** They come from `nflreadr::load_participation()`, which
+lists the eleven offensive players on every play, so a receiver who ran a route
+and was never looked at still counts — which is the whole point, since touches
+and targets would fold his usage back into his production. Participation joins
+100% of scrimmage plays with exactly 11 players on each, in all ten seasons it
+covers.
+
+It exists **from 2016 only**. Earlier seasons carry `has_snaps: false`, zero
+snaps, and the column falls back to touches and targets with the header renamed
+to match — two different measurements are never printed under one name. Ten
+seasons have snaps, thirteen do not.
+
+It is close to but not perfectly clean: the passer is listed on 99.8% of pass
+plays, and on **16 of 12,828 player-bands (0.1%)** a player is charged with more
+touches than snaps — almost always a quarterback on a team that changed starters
+mid-season, where participation attributes the other quarterback's personnel
+grouping. `npm run data:garbage:check` reports the rate per season rather than
+hiding it; it is upstream data, so it is surfaced rather than failed.
+
+The panel carries no prose. Two columns of percentages next to each other make
+the comparison without a sentence restating it, and the games count sits in the
+heading so "per game" has its denominator.
+
+**Any number of players can be open at once**, because reading two against each
+other is the point and a single-open table forces the reader to hold the first in
+their head. The open set lives on the page, so it survives a re-sort, and clears
+when the position or season changes — those rows belong to a table that is no
+longer on screen. A **Collapse all (n)** control appears once anything is open.
+
+Rows and cards say they open. Each carries a chevron that rotates when expanded,
+and in the table that chevron is a real `<button>` — tabbable, labelled "Show /
+Hide {player}, {team}, detail", and carrying `aria-expanded` — because a row that
+signals itself only with a cursor change and a hover tint says nothing on a
+touch screen and nothing to a keyboard. The row around it stays clickable for
+the mouse, with `stopPropagation` on the button so the panel does not toggle
+twice and appear stuck. A line above the table says the interaction exists
+before anyone tries it.
+
+The label carries the team because names are not unique: two Steve Smiths, two
+Mike Williamses and two Zach Millers each share a position and a season in this
+archive, and without it a screen reader would announce two identical controls.
+
+There is deliberately **no chart in the panel** — the row that opened it already
+draws the three bands, as a stacked bar in the table and as a labelled bar on a
+card, so a donut underneath would be the same split a second time a few pixels
+below the first.
+
 On a wide screen the team-context line sits beside the table rather than under
 it, so the table keeps a readable measure instead of stretching four number
 columns across the page.
@@ -399,10 +463,11 @@ columns across the page.
 The donut survives on the **trends** page, where it shows a whole offense and
 there is no breakdown bar for it to duplicate.
 
-### League trends
+### League stats
 
-A **League trends** button on the garbage-time header opens `/garbagetime/trends`,
-the same relationship the 4th-down page has with its own trends view. It holds
+A **League Stats** button on the garbage-time header opens `/garbagetime/trends`,
+the same relationship the 4th-down page has with its own trends view. (The path
+keeps its original name so existing links survive; only the label changed.) It holds
 the two things that are about offenses rather than players:
 
 - **How much of each offense's season happened in one game state** — 32 bars in

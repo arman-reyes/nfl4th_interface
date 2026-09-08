@@ -1,42 +1,40 @@
 import { removedBins, totals } from '../../lib/garbageTime'
-import type { PlayerRow, Removals } from '../../lib/garbageTime'
-import type { GarbageTimeFile } from '../../types'
+import type { Band, Format, PlayerRow, Removals } from '../../lib/garbageTime'
+import type { GarbageTimeFile, TeamAbbr } from '../../types'
 import { StatSplitTable } from './StatSplitTable'
 import { POSITION_LINES } from './statLines'
+import { PlayerBands } from './PlayerBands'
 
 interface Props {
   row: PlayerRow
   file: GarbageTimeFile
+  format: Format
   threshold: number
   remove: Removals
-  /** Where the player's team ranks in the league for garbage-time exposure. */
-  teamRank: number
-}
-
-function ordinal(n: number): string {
-  const rest = n % 100
-  if (rest >= 11 && rest <= 13) return `${n}th`
-  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+  /** Each team's share of its own snaps in each band. */
+  teamShares: Map<TeamAbbr, Record<Band, number>>
 }
 
 /**
- * One player opened up: which counting stats the removals took, and how much of
- * that was his team's situation rather than his own.
+ * One player opened up: which counting stats the removals took, and how he was
+ * used in each state of the game.
  *
  * There is deliberately no chart of the three bands here. The row that opened
  * this panel already draws them — as a stacked bar in the table, as a labelled
  * bar on a card — so a donut underneath would be the same split a second time,
  * a few pixels below the first. What a reader cannot get from that row is which
- * catches and yards and touchdowns the removals actually took, which is what
- * this panel is for.
- *
- * The team-context line sits beside the table on a wide screen rather than
- * under it, so the table keeps a readable measure instead of stretching its
- * four number columns across the page.
+ * catches and yards and touchdowns the removals took, and what his season was
+ * actually worth in each state of the game — the bar gives three shares, but a
+ * share cannot say whether a third of a season is seventy points or seven.
  */
-// No `format` here: the panel shows counting stats, which are the same whatever
-// a reception is worth, and the per-game points were already scored upstream.
-export function PlayerDetail({ row, file, threshold, remove, teamRank }: Props) {
+export function PlayerDetail({
+  row,
+  file,
+  format,
+  threshold,
+  remove,
+  teamShares,
+}: Props) {
   const gone = removedBins(file.bins, threshold, remove)
   const all = totals(row.player.bins)
   const kept = totals(row.player.bins, gone)
@@ -62,31 +60,13 @@ export function PlayerDetail({ row, file, threshold, remove, teamRank }: Props) 
           </div>
         </div>
 
-        <p className="text-[0.6875rem] leading-relaxed text-stone-600 lg:self-center">
-          <span className="tnum font-semibold text-stone-900">
-            {row.player.team} ran {(row.teamGarbageRate * 100).toFixed(1)}% of its offensive plays
-            in garbage time
-          </span>{' '}
-          — {ordinal(teamRank)} most in the league.{' '}
-          {row.usageLift >= 1.25 ? (
-            <>
-              He was there for{' '}
-              <span className="tnum font-semibold">{row.usageLift.toFixed(1)}×</span> his
-              team&rsquo;s share of it, so this is about how he was used, not only who he played
-              for.
-            </>
-          ) : row.usageLift <= 0.8 ? (
-            <>
-              He saw <span className="tnum font-semibold">{row.usageLift.toFixed(1)}×</span> his
-              team&rsquo;s share of it — less garbage time than his own offense played.
-            </>
-          ) : (
-            <>
-              He took roughly his team&rsquo;s share of it, so a large cut here is largely the
-              situation he was in rather than a verdict on him.
-            </>
-          )}
-        </p>
+        <PlayerBands
+          player={row.player}
+          file={file}
+          format={format}
+          threshold={threshold}
+          teamShares={teamShares}
+        />
       </div>
     </div>
   )

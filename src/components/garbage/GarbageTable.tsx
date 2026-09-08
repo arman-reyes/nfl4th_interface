@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { BANDS, PPR, splitByBand } from '../../lib/garbageTime'
-import type { Format, PlayerRow, Removals } from '../../lib/garbageTime'
+import type { Band, Format, PlayerRow, Removals } from '../../lib/garbageTime'
 import type { GarbageTimeFile, TeamAbbr } from '../../types'
 import { TeamPill } from '../TeamPill'
 import { PlayerDetail } from './PlayerDetail'
@@ -17,10 +17,12 @@ interface Props {
   threshold: number
   remove: Removals
   sort: SortKey
-  openId: string | null
-  teamRanks: Map<TeamAbbr, number>
+  /** Every player currently expanded. Any number may be open at once. */
+  openIds: ReadonlySet<string>
+  teamShares: Map<TeamAbbr, Record<Band, number>>
   onSort: (key: SortKey) => void
-  onOpen: (id: string | null) => void
+  onToggle: (id: string) => void
+  onCollapseAll: () => void
 }
 
 const HEAD =
@@ -50,6 +52,38 @@ const SORT_LABEL: Record<SortKey, string> = {
   actual: 'Actual points',
   delta: 'Rank change',
   share: 'Garbage-time share',
+}
+
+/**
+ * The expand affordance.
+ *
+ * A row that only signals itself with a cursor change and a hover tint says
+ * nothing on a touch screen and nothing to a keyboard, so the chevron is a real
+ * button: it carries the aria-expanded state, it is tabbable, and it points the
+ * way the panel will move. The row around it stays clickable for the mouse.
+ */
+function ExpandChevron({ open, name }: { open: boolean; name: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-stone-400 transition-transform ${
+        open ? 'rotate-180 bg-stone-200 text-stone-700' : 'group-hover:bg-stone-200 group-hover:text-stone-700'
+      }`}
+      title={open ? `Hide ${name}` : `Show ${name}`}
+    >
+      <svg
+        viewBox="0 0 10 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-1.5 w-2.5"
+      >
+        <path d="M1 1l4 4 4-4" />
+      </svg>
+    </span>
+  )
 }
 
 function Delta({ value }: { value: number }) {
@@ -99,6 +133,11 @@ function BandLegend() {
  * The ranking, twice over: what a player scored and what survives the removals,
  * with the distance between the two ranks.
  *
+ * Any number of rows may be open at once, so two players can be read against
+ * each other without one closing the other — the comparison is the point, and a
+ * single-open table forces the reader to hold the first in their head. The open
+ * set is the page's state rather than the row's, so it survives a re-sort.
+ *
  * Two layouts rather than one that bends. Seven columns of numbers cannot be
  * shrunk to a phone and stay legible, and scrolling a table sideways takes the
  * player's name off screen — the one column that says whose row it is. Below
@@ -113,10 +152,11 @@ export function GarbageTable({
   threshold,
   remove,
   sort,
-  openId,
-  teamRanks,
+  openIds,
+  teamShares,
   onSort,
-  onOpen,
+  onToggle,
+  onCollapseAll,
 }: Props) {
   const bandsOf = (row: PlayerRow) =>
     splitByBand(row.player.bins, file.bins, threshold, PPR[format])
@@ -136,9 +176,10 @@ export function GarbageTable({
     <PlayerDetail
       row={row}
       file={file}
+      format={format}
       threshold={threshold}
       remove={remove}
-      teamRank={teamRanks.get(row.player.team) ?? 32}
+      teamShares={teamShares}
     />
   )
 
@@ -177,18 +218,31 @@ export function GarbageTable({
           </select>
         </div>
         <BandLegend />
+        <div className="flex items-center justify-between gap-3 px-3 pb-2 sm:px-4">
+          <p className="text-[0.625rem] text-stone-400">
+            Select any number of players to compare their points by game state.
+          </p>
+          {openIds.size > 0 && (
+            <button
+              onClick={onCollapseAll}
+              className="shrink-0 rounded border border-stone-300 px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-stone-600 uppercase hover:border-stone-500 hover:text-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none"
+            >
+              Collapse all ({openIds.size})
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Phones: one card per player, every number labelled. */}
       <ul className="sm:hidden">
         {rows.map((row) => {
-          const open = openId === row.player.id
+          const open = openIds.has(row.player.id)
           return (
             <li key={row.player.id} className="border-b border-stone-100 last:border-b-0">
               <button
-                onClick={() => onOpen(open ? null : row.player.id)}
+                onClick={() => onToggle(row.player.id)}
                 aria-expanded={open}
-                className={`w-full px-3 py-3 text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-stone-900 focus-visible:outline-none ${
+                className={`group w-full px-3 py-3 text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-stone-900 focus-visible:outline-none ${
                   open ? 'bg-stone-50' : ''
                 }`}
               >
@@ -203,6 +257,7 @@ export function GarbageTable({
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-stone-900">
                     {row.player.name}
                   </span>
+                  <ExpandChevron open={open} name={row.player.name} />
                 </span>
 
                 <span className="mt-2.5 grid grid-cols-3 gap-2 pl-8">
@@ -268,18 +323,22 @@ export function GarbageTable({
                   </button>
                 </th>
               ))}
+              <th className={`${HEAD} w-8 px-2 py-2`}>
+                <span className="sr-only">Expand</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const open = openId === row.player.id
+              const open = openIds.has(row.player.id)
               return (
                 <Fragment key={row.player.id}>
                   <tr
-                    className={`cursor-pointer border-b border-stone-100 transition-colors ${
+                    aria-expanded={open}
+                    className={`group cursor-pointer border-b border-stone-100 transition-colors ${
                       open ? 'bg-stone-50' : 'hover:bg-stone-50'
                     }`}
-                    onClick={() => onOpen(open ? null : row.player.id)}
+                    onClick={() => onToggle(row.player.id)}
                   >
                     <td className="tnum px-3 py-2 text-right text-xs font-semibold text-stone-400">
                       {rankOf(row)}
@@ -304,10 +363,29 @@ export function GarbageTable({
                     <td className="px-2 py-2 text-center">
                       <BandBreakdown split={bandsOf(row)} total={row.actual} />
                     </td>
+                    <td className="w-8 px-2 py-2 text-right">
+                      <button
+                        onClick={(event) => {
+                          // the row is clickable too; without this the panel
+                          // would toggle twice and never open
+                          event.stopPropagation()
+                          onToggle(row.player.id)
+                        }}
+                        aria-expanded={open}
+                        // The team disambiguates: two Steve Smiths, two Mike
+                        // Williamses and two Zach Millers share a position and a
+                        // season in this archive, and a screen reader would
+                        // otherwise announce two identical controls.
+                        aria-label={`${open ? 'Hide' : 'Show'} ${row.player.name}, ${row.player.team}, detail`}
+                        className="rounded-full focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none"
+                      >
+                        <ExpandChevron open={open} name={row.player.name} />
+                      </button>
+                    </td>
                   </tr>
                   {open && (
                     <tr>
-                      <td colSpan={6} className="p-0">
+                      <td colSpan={7} className="p-0">
                         {detailFor(row)}
                       </td>
                     </tr>

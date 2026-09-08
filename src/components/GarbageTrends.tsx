@@ -103,8 +103,8 @@ export function GarbageTrends({ onNavigate, onBack }: Props) {
           </div>
         </div>
         <p className="mt-1 max-w-2xl text-sm text-stone-500">
-          League trends: how much garbage time each offense played, and what one team&rsquo;s
-          season looks like with it removed.
+          League stats: how much of each offense&rsquo;s season happened in each state of the
+          game, and what one team&rsquo;s numbers look like split by it.
         </p>
       </header>
 

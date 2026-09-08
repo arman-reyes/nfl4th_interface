@@ -196,7 +196,16 @@ export type StatKey =
   | 'two_pt_pass'
   | 'two_pt_score'
   | 'st_td'
+  /** Touches and targets — what he was charged with, not what he played. */
   | 'plays'
+  /**
+   * Snaps he was on the field for.
+   *
+   * From nflverse participation, which lists the eleven offensive players on
+   * each play, so it counts a receiver who ran a route and was never looked at.
+   * Only exists from 2016; earlier seasons carry zero and set `has_snaps` false.
+   */
+  | 'snaps'
 
 /**
  * Counting stats for one player in one bin, positionally encoded in StatKey
@@ -250,6 +259,8 @@ export interface GarbageTimeFile {
   /** Highest regular-season week present, so an in-progress season says so. */
   through_week: number
   complete: boolean
+  /** False before 2016, where per-play participation does not exist. */
+  has_snaps: boolean
   /** Index matches every BinRow and GarbageTeam.plays index. */
   bins: GarbageBin[]
   /** Index of the single 'clean' lump bin. */

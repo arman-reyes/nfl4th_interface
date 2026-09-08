@@ -9,6 +9,7 @@ import {
   garbageBins,
   leagueShares,
   removedBins,
+  bandUsage,
   splitByBand,
   STAT_ORDER,
   teamBandShares,
@@ -320,24 +321,59 @@ describe('buildRows', () => {
     expect(row.actualPerGame).toBeCloseTo(100, 6)
   })
 
-  it('measures usage against the team, so a bad offense is not held against a player', () => {
-    // The team ran a tenth of its plays in garbage time. `even` matched that
-    // rate; `mopup` did nothing else.
-    const teams = [makeTeam('KC', [[0, 100], [CLEAN_BIN, 900]])]
-    const even = makePlayer('even', 'WR', [
-      [0, { rec_yds: 10, plays: 10 }],
-      [CLEAN_BIN, { rec_yds: 90, plays: 90 }],
+  it('measures usage per band, so a receiver is not judged against a state he never played', () => {
+    // KC ran a tenth of its snaps trailing and a twentieth leading.
+    const teams = [makeTeam('KC', [[0, 100], [24, 50], [CLEAN_BIN, 850]])]
+    // A receiver whose extra work is all while behind, and a back whose is all
+    // while ahead. Pooled together they would look identically garbage-heavy.
+    // Usage is measured from snaps, not yardage: he is in a game state whether
+    // or not the ball came near him.
+    const wr = makePlayer('wr', 'WR', [
+      [0, { rec_yds: 100, tgt: 12, plays: 12, snaps: 30 }],
+      [CLEAN_BIN, { rec_yds: 400, tgt: 40, plays: 40, snaps: 70 }],
     ])
-    const mopup = makePlayer('mopup', 'WR', [[0, { rec_yds: 50, plays: 20 }]])
-    const rows = buildRows(makeFile([even, mopup], teams), {
-      threshold: 0.1,
-      format: 'ppr',
-      remove: DEFAULT_REMOVALS,
+    const rb = makePlayer('rb', 'RB', [
+      [24, { rush_yds: 200, rush_att: 12, plays: 12, snaps: 30 }],
+      [CLEAN_BIN, { rush_yds: 600, rush_att: 40, plays: 40, snaps: 70 }],
+    ])
+    const file = makeFile([wr, rb], teams)
+    const shares = teamBandShares(file, 0.1)
+
+    const forWr = bandUsage(wr, file, 0.1, shares)
+    expect(forWr.trailing.playerShare).toBeCloseTo(0.3, 6)
+    expect(forWr.trailing.teamShare).toBeCloseTo(0.1, 6)
+    expect(forWr.trailing.lift).toBeCloseTo(3, 6)
+    // and he is credited with no leading exposure at all
+    expect(forWr.leading.playerShare).toBe(0)
+    expect(forWr.leading.lift).toBe(0)
+
+    const forRb = bandUsage(rb, file, 0.1, shares)
+    expect(forRb.leading.playerShare).toBeCloseTo(0.3, 6)
+    expect(forRb.leading.teamShare).toBeCloseTo(0.05, 6)
+    expect(forRb.leading.lift).toBeCloseTo(6, 6)
+    expect(forRb.trailing.playerShare).toBe(0)
+    expect(forWr.trailing.basis).toBe('snaps')
+  })
+
+  it('falls back to touches on a season with no participation data', () => {
+    const teams = [makeTeam('KC', [[0, 100], [CLEAN_BIN, 900]])]
+    // Snaps and touches disagree on purpose: he played a third of his snaps
+    // while behind but was thrown at in only a tenth of his touches there.
+    const wr = makePlayer('wr', 'WR', [
+      [0, { plays: 10, snaps: 30 }],
+      [CLEAN_BIN, { plays: 90, snaps: 70 }],
+    ])
+    const withSnaps = makeFile([wr], teams, true)
+    const without = makeFile([wr], teams, false)
+
+    expect(bandUsage(wr, withSnaps, 0.1, teamBandShares(withSnaps, 0.1)).trailing).toMatchObject({
+      playerShare: 0.3,
+      basis: 'snaps',
     })
-    const byId = Object.fromEntries(rows.map((r) => [r.player.id, r]))
-    expect(byId.even.teamGarbageRate).toBeCloseTo(0.1, 6)
-    expect(byId.even.usageLift).toBeCloseTo(1, 6)
-    expect(byId.mopup.usageLift).toBeCloseTo(10, 6)
+    expect(bandUsage(wr, without, 0.1, teamBandShares(without, 0.1)).trailing).toMatchObject({
+      playerShare: 0.1,
+      basis: 'touches',
+    })
   })
 
   it('reports leading-garbage points even when they are not being stripped', () => {

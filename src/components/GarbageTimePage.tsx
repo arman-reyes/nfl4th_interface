@@ -7,7 +7,7 @@ import {
   leagueShares,
   POSITIONS,
   STARTABLE,
-  teamRates,
+  teamBandShares,
 } from '../lib/garbageTime'
 import type { Band, Format, PlayerRow, Removals } from '../lib/garbageTime'
 import type { FantasyPos } from '../types'
@@ -62,7 +62,7 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
   const [threshold, setThreshold] = useState(0.1)
   const [remove, setRemove] = useState<Removals>(DEFAULT_REMOVALS)
   const [sort, setSort] = useState<SortKey>('actual')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set())
   const [aboutOpen, setAboutOpen] = useState(false)
 
   const list = seasons.data
@@ -76,13 +76,11 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
   const model = useMemo(() => {
     if (!data) return null
     assertStatOrder(data)
-    const rates = teamRates(data, settings.threshold)
-    const ranked = [...rates.entries()].sort((a, b) => b[1] - a[1])
+    const teamShares = teamBandShares(data, settings.threshold)
     return {
       rows: buildRows(data, settings),
       shares: leagueShares(data, settings.threshold),
-      rates,
-      teamRanks: new Map(ranked.map(([team], i) => [team, i + 1])),
+      teamShares,
     }
   }, [data, settings])
 
@@ -123,7 +121,17 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
 
   function changePosition(next: FantasyPos) {
     setPos(next)
-    setOpenId(null)
+    // The open rows belonged to the position being left; carrying them over
+    // would leave panels open for players no longer in the table.
+    setOpenIds(new Set())
+  }
+
+  function toggleOpen(id: string) {
+    setOpenIds((current) => {
+      const next = new Set(current)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   }
 
   return (
@@ -136,7 +144,7 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
               onClick={onTrends}
               className="rounded border border-stone-300 px-2.5 py-1 text-xs font-semibold tracking-wide text-stone-600 uppercase hover:border-stone-500 hover:text-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:outline-none"
             >
-              League trends
+              League Stats
             </button>
             <AboutButton onClick={() => setAboutOpen(true)} tone="muted" />
           </div>
@@ -169,7 +177,7 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
             shares={model.shares}
             onSeason={(next) => {
               setChosen(next)
-              setOpenId(null)
+              setOpenIds(new Set())
             }}
             onFormat={setFormat}
             onThreshold={setThreshold}
@@ -205,7 +213,7 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
               <StatTile
                 label="Garbage-time plays"
                 value={`${((model.shares.trailing + model.shares.leading) * 100).toFixed(1)}%`}
-                note={`Of all ${season} offensive plays, at this threshold.`}
+                note={`Of all ${season} offensive plays. Each snap counts once, for whichever offense was on the field.`}
                 benchmark={`${(model.shares.trailing * 100).toFixed(1)}% trailing · ${(
                   model.shares.leading * 100
                 ).toFixed(1)}% leading`}
@@ -220,10 +228,11 @@ export function GarbageTimePage({ onNavigate, onTrends }: Props) {
             threshold={threshold}
             remove={remove}
             sort={sort}
-            openId={openId}
-            teamRanks={model.teamRanks}
+            openIds={openIds}
+            teamShares={model.teamShares}
             onSort={setSort}
-            onOpen={setOpenId}
+            onToggle={toggleOpen}
+            onCollapseAll={() => setOpenIds(new Set())}
           />
 
 

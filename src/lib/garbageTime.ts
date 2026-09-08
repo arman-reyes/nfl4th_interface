@@ -42,6 +42,7 @@ export const STAT_ORDER: StatKey[] = [
   'two_pt_score',
   'st_td',
   'plays',
+  'snaps',
 ]
 
 export type Totals = Record<StatKey, number>
@@ -299,15 +300,6 @@ export interface PlayerRow {
   rankDelta: number
   actualPerGame: number
   remainingPerGame: number
-  /** His team's share of offensive plays that fell in either garbage band. */
-  teamGarbageRate: number
-  /**
-   * His share of touches and targets that came in garbage time, over his team's
-   * garbage-play rate. Above 1 means he was used disproportionately once the
-   * game was gone — the difference between a bad team's WR1 and a WR4 who only
-   * sees the field in mop-up.
-   */
-  usageLift: number
 }
 
 /** Per-team share of offensive plays that fell in either garbage band. */
@@ -360,6 +352,64 @@ export function teamBandShares(
   return out
 }
 
+export interface BandUsage {
+  /**
+   * Share of his snaps that fell in this band — or of his touches and targets
+   * on a season with no participation data. `basis` says which.
+   */
+  playerShare: number
+  /** Share of his team's offensive snaps that fell in it. */
+  teamShare: number
+  /**
+   * playerShare ÷ teamShare. Above 1 means he was on the field for more of this
+   * state than his offense played of it — the difference between a bad team's
+   * WR1 and a WR4 who only appears in mop-up.
+   */
+  lift: number
+  /** What playerShare counts. Snaps where they exist, touches otherwise. */
+  basis: 'snaps' | 'touches'
+}
+
+/**
+ * How a player was used in each state of the game, against how much of it his
+ * offense played.
+ *
+ * Split by band rather than pooled, because trailing and leading garbage are
+ * opposite situations that happen to different players: a receiver piles up
+ * targets while his team is buried, a back gets carries while his team runs
+ * the clock out. A single "garbage time" rate averages a receiver's real
+ * exposure with a leading band he was never on the field for, and reports a
+ * number that describes neither.
+ */
+export function bandUsage(
+  player: GarbagePlayer,
+  file: GarbageTimeFile,
+  threshold: number,
+  teamShares: Map<TeamAbbr, Record<Band, number>>,
+): Record<Band, BandUsage> {
+  const mine = totalsByBand(player.bins, file.bins, threshold)
+  // Snaps are the honest denominator: a receiver is in a game state whether or
+  // not the ball came near him. Touches are the fallback for the seasons that
+  // predate participation data, and `basis` tells the interface which it got so
+  // it can label the column truthfully rather than calling both "snaps".
+  const key: StatKey = file.has_snaps ? 'snaps' : 'plays'
+  const basis = file.has_snaps ? 'snaps' : 'touches'
+  const whole = BANDS.reduce((sum, band) => sum + mine[band][key], 0)
+  const team = teamShares.get(player.team)
+  const out = {} as Record<Band, BandUsage>
+  for (const band of BANDS) {
+    const playerShare = whole > 0 ? mine[band][key] / whole : 0
+    const teamShare = team?.[band] ?? 0
+    out[band] = {
+      playerShare,
+      teamShare,
+      lift: teamShare > 0 ? playerShare / teamShare : 0,
+      basis,
+    }
+  }
+  return out
+}
+
 /**
  * The share of the league's offensive plays in each garbage band.
  *
@@ -395,24 +445,13 @@ export function leagueShares(
 export function buildRows(file: GarbageTimeFile, s: Settings): PlayerRow[] {
   const ppr = PPR[s.format]
   const removed = removedBins(file.bins, s.threshold, s.remove)
-  const garbage = garbageBins(file.bins, s.threshold)
-  const rates = teamRates(file, s.threshold)
-  const playsAt = STAT_ORDER.indexOf('plays')
 
   const partial = file.players.map((player) => {
     const all = totals(player.bins)
     const actual = fantasyPoints(all, ppr)
     const remaining = fantasyPoints(totals(player.bins, removed), ppr)
     const split = splitByBand(player.bins, file.bins, s.threshold, ppr)
-
-    let garbagePlays = 0
-    for (const [bin, line] of player.bins) {
-      if (garbage.has(bin)) garbagePlays += line[playsAt] ?? 0
-    }
-
     const games = Math.max(player.games, 1)
-    const teamRate = rates.get(player.team) ?? 0
-    const playerRate = all.plays > 0 ? garbagePlays / all.plays : 0
     const garbagePoints = split.trailing + split.leading
     return {
       player,
@@ -427,8 +466,6 @@ export function buildRows(file: GarbageTimeFile, s: Settings): PlayerRow[] {
       rankDelta: 0,
       actualPerGame: actual / games,
       remainingPerGame: remaining / games,
-      teamGarbageRate: teamRate,
-      usageLift: teamRate > 0 ? playerRate / teamRate : 0,
     }
   })
 
