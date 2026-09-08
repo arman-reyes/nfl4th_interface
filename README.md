@@ -68,6 +68,76 @@ consistency. Every file it writes is overwritten by the R pipeline. The index it
 produces is stamped `"fixture": true`, which the app surfaces in the UI, so fixture
 numbers can never be mistaken for real ones.
 
+### Garbage time
+
+A second pipeline, independent of the 4th-down one. `scripts/garbage-time.R`
+reads full regular-season play-by-play and rebuilds every fantasy counting stat
+from it, bucketed by the win probability the offense faced *before* the snap.
+
+```bash
+Rscript scripts/garbage-time.R            # SEASONS at the top of the file
+Rscript scripts/garbage-time.R 2016:2025  # or a range on the command line
+npm run data:garbage:check                # read it back through src/lib
+```
+
+Set `GT_CACHE=<dir>` to cache each season's play-by-play as `.rds`, which makes
+a multi-season backfill resumable — without it every season re-downloads, at
+about three minutes each.
+
+It writes one file per season to `public/data/garbage/` (~230 KB each) plus
+`seasons.json`. The browser fetches one season at a time, so the payload does
+not grow with the archive.
+
+**Why bins.** The threshold that separates garbage time from football is a
+control on the page, so no single cut can be baked in. Production is bucketed
+into 25 win-probability bins — twelve 2.5%-wide bins under 0.30, twelve mirrored
+above 0.70, and one lump for everything between — and the client cumulative-sums
+the bins under whatever the reader picked. The two-score margin gate is *not* a
+control, so it is applied here: a play that fails it lands in the lump whatever
+its win probability, which is what stops a reader sliding the threshold until a
+two-minute drill counts as garbage.
+
+**The reconciliation gate.** Every season is checked against
+`nflreadr::load_player_stats()` before it is written, and a season that cannot
+rebuild nflverse's own fantasy totals is skipped rather than shipped;
+`seasons.json` lists only what passed. The gate looks at the share of players
+affected as well as the worst one, because a dropped stat category moves
+hundreds of players at once while the known residuals move two or three.
+
+Those residuals are irreducible: how nflverse splits yardage on a lateral, and
+whether it charges a fumble on an aborted snap. Both are worth at most a fumble,
+never a touchdown. Recent seasons land at median 0, p95 0, and a worst case
+under a point.
+
+**Seasons that do not pass**, and why — worth reading before widening the range:
+
+| Season | Reason |
+|---|---|
+| 1999, 2000 | ~40% of players mismatch. The play-by-play is genuinely incomplete this far back. |
+| 2001 | Three players off by up to 4 points. |
+| 2011 | One player: a kickoff return that carries `rush_touchdown` and rushing yardage, which nflverse counts as rushing and no sane offensive filter will. |
+
+Several attribution rules in that script look arbitrary and are not; each is
+commented where it sits. The ones worth knowing about:
+
+- **Gate on `play_type`, never on `pass_attempt`/`rush_attempt`.** A play wiped
+  out by penalty keeps its attempt flags and its player ids, and only
+  `play_type == "no_play"` marks it. Measured across 2024 and 2025, not a single
+  nullified play carries yardage — which is what makes it safe to recover the
+  rare fake punt that is filed as `no_play` but whose yards stand anyway.
+- **Kneels and spikes count**, as official rushing attempts and incompletions.
+  Kneels sit almost entirely in leading garbage time, so dropping them would
+  bias exactly the panel being drawn.
+- **Sacks are excluded.** nflfastR sets `pass_attempt` on them; the NFL does not.
+- **There is no `td_team` check.** It reads like an obvious guard, but
+  `pass_touchdown` and `rush_touchdown` are already offensive-only markers, and
+  `td_team` is unreliable in older data — in 2002 a Jacksonville back's rushing
+  touchdowns carry `td_team` values of NYJ, PHI, HOU and WAS.
+- **Special-teams touchdowns are counted by nflverse and only located here.**
+  Its rule for what counts is not reconstructable from the play-by-play: a
+  kickoff recovered in the end zone by the kicking team counts, a muffed punt
+  recovered the same way does not.
+
 ## League trends
 
 A second view, reached from the header on either screen. Four metrics across
@@ -169,6 +239,239 @@ so answering and advancing are atomic. Two clicks landing in the same tick — a
 double-click on Next, or a click racing the clock — otherwise both read the same
 stale value and record a call for a question the reader never saw.
 
+## Switching between pages
+
+Each statistical display owns the page heading, and the heading is the switcher:
+a dropdown arrow beside "4th Down Stats" or "Garbage Time" opens a menu of the
+others, each with a line on what it answers. Moving between them is the same
+gesture as reading which one you are on.
+
+The registry is `SECTIONS` in `src/lib/routes.ts`. **Adding a page is one entry
+there** — title, blurb, and the view it routes to — and it appears in the menu on
+every other page with nothing else to wire up.
+
+League trends and the quiz are deliberately not sections. They are ways of
+reading the 4th-down data rather than separate bodies of it, so they stay on that
+page's own header where they have always been.
+
+## Garbage time
+
+A page at `/garbagetime`: the same fantasy rankings a reader already knows, with
+one subtraction — the plays that happened after the game stopped being in doubt.
+
+A play is garbage time when the offense's pre-snap win probability was under the
+threshold **and** it was at least two scores behind. The second condition is what
+keeps a two-minute drill out: trailing by eight with a minute left is a low win
+probability and the most contested football there is. Only 3% of sub-10% plays
+are one-score games, and their median is 1.3 minutes left at exactly −8.
+
+The controls sit in two halves of one row, because they do different jobs and
+the difference is easy to miss. On the left, **the threshold** decides what counts
+as garbage time — everywhere on the page, including the garbage share column and
+the per-team rates. On the right, **"Remove points from total"** decides only what
+comes out of the **Remaining** column:
+
+| Checkbox | Default |
+|---|---|
+| Garbage time points when trailing | on |
+| Garbage time points when leading | off |
+| Competitive points | off |
+
+Those three are the whole season between them, so the table's Remaining column is
+whatever is left of the three. Unchecking all of them makes Remaining equal
+Actual; checking all three zeroes it out, and the page says so rather than
+showing a ranking of zeroes. Checking only the third inverts the question
+entirely — what a player scored *only* in garbage time. They are the same three
+segments as the donut in an opened row, so a reader can see what a box is about
+to take out.
+
+The **Points Breakdown** column is a stacked bar of the three bands rather than a
+single garbage-share percentage. One number could not tell a receiver whose
+extra production came while his team was buried from a back whose came while his
+team was coasting — opposite situations that a share collapsed into the same
+value. One legend above the table gives the colour order, so no row carries its
+own key.
+
+In the table the bar is **flanked by the two garbage shares**, each in its own
+band's colour: trailing on the left where its segment starts, leading on the
+right where its segment ends. The competitive share is the remainder and is left
+to the bar. The flanks are fixed-width so every bar in the column starts and
+ends on the same pixel — ragged numbers stagger the bars and make the column
+unscannable — and the whole assembly is centred under its heading rather than
+right-aligned like the number columns beside it.
+
+Colouring those numbers is a deliberate exception to the usual rule that text
+wears text tokens and only marks carry series colour. It is legitimate here
+because the number *is* the mark's identity, standing in for a per-row legend,
+and because both colours clear WCAG AA for normal text against the row and its
+hover tint (5.0:1 and 6.7:1 — measured, not assumed).
+
+The three band colours live in `src/components/garbage/bandStyle.ts` and are
+shared by everything that draws them — the breakdown bar, the mobile card, the
+team donut on the trends page — because the same colour has to mean the same
+band everywhere or the page lies. They are a **diverging** scale rather than
+three peer categories, because that is what the data is: two poles of one
+win-probability axis either side of a neutral middle. The grey midpoint is
+prescribed by that form rather than being a compromise, and the amber and blue
+poles clear every colour-vision check against the page's surface — lightness
+band, CVD separation, normal-vision floor and contrast. Within the site's own
+stone-and-amber palette three distinguishable bands are not achievable: two
+ambers land at 13.4 ΔE for normal vision, below the hard floor of 15.
+
+A band can be negative — a quarterback whose only competitive snap was an
+interception — so it contributes no width to a bar and the number beside it
+carries the real value.
+
+The table has **two layouts, not one that bends**. Seven columns of numbers
+cannot shrink to a phone and stay legible, and scrolling a table sideways takes
+the player's name off screen — the one column that says whose row it is. Below
+`sm` each player is a card where every number keeps its label, which matters
+most here because Remaining, Actual and Δ Rank are easy to confuse; above it the
+table returns, still `overflow-x-auto` for the widths in between.
+
+The table sorts from its column headers, which a card list has none of, so the
+phone gets **its own Sort by control** rather than losing the ability to sort.
+Its labels are fuller than the column headers — a header can be terse because it
+sits above its own numbers, and "Points from" means nothing in a dropdown.
+
+**Rank changes are red for a fall and green for a rise**, darkening with the size
+of the move — a diverging encoding around a zero that means "did not move". The
+headline mover tiles use the same ramp, and derive their arrow from the sign
+rather than hard-coding one, so with nothing removed they read "—" instead of
+claiming a fall of zero.
+
+Red and green is the one pairing colour-vision deficiency attacks, so it is used
+here only because **direction is never carried by colour alone**: every value
+ships with an arrow and keeps its sign. The steps in
+`src/components/garbage/rankTone.ts` were measured rather than chosen — every one
+clears WCAG AA for normal text on the row and its hover tint, the lightest pair
+separates at ΔE 8.6 under simulated deuteranopia and protanopia, and the two
+darker pairs sit at 6.7 and 6.6, inside the band that is permissible with a
+secondary encoding. Green darkens through *emerald* because Tailwind's green-900
+loses enough chroma to read as grey and collapses to ΔE 3.5 against a dark red —
+the obvious ramp walks straight into that. The three magnitude steps come from
+the real distribution: across 8,810 player-seasons two thirds of moves are four
+places or fewer, and only the top 5% reach twelve.
+
+The **rank shown against a row follows whichever ranking is being sorted on**.
+Pinned to the actual rank, sorting by Remaining printed a scrambled column — 3,
+1, 7, 2 — which reads as a bug rather than as a deliberate second ranking.
+Sorting by rank change or garbage share is a deliberate reordering of a ranking,
+so those keep the actual rank.
+
+**Remaining sits to the left of Actual** because it is the column the page is
+about; Actual is the thing it is being read against. It is called Remaining and
+not "Clean" because with the third box ticked it is not clean, it is the garbage.
+
+Three further decisions shape the page:
+
+- **Trailing garbage is removed by default; leading garbage is not.** That
+  matches how the phrase is normally used, but it is not symmetric and the page
+  says so. Plays with the offense hopeless are about three-quarters passes;
+  plays with it comfortably ahead are mostly runs. Stripping only the first
+  takes points from quarterbacks and receivers while leaving a running back's
+  clock-killing carries alone, so the second is measured, shown, and one click
+  from being removed too. The **Garbage** share column always counts both bands,
+  whichever ones are being removed — the share a player carries is a fact about
+  his season and the threshold, not about what the reader is subtracting.
+- **The threshold snaps to 2.5% steps.** A cut inside a bin cannot be answered by
+  summing bins, and interpolating would mean inventing plays that are not in the
+  file. The control carries a live readout of what share of the league's
+  offensive plays the current setting calls garbage — around 11% at the default.
+- **The file carries more players than the page shows.** Ranking by actual points
+  and keeping the top 100 would structurally exclude the players at the other end
+  of the story: someone 108th on actual but 82nd once cleaned is exactly the
+  finding, and would not be in the file. The pipeline keeps the union of the top
+  120 by actual points and the top 120 by clean points at the most aggressive
+  settings the controls allow.
+
+Opening a row shows what the removals actually took: his counting stats actual
+against remaining, and a line putting his team's garbage-time exposure next to
+his own. There is deliberately **no chart in the panel** — the row that opened
+it already draws the three bands, as a stacked bar in the table and as a
+labelled bar on a card, so a donut underneath would be the same split a second
+time a few pixels below the first. What a reader cannot get from the row is
+which catches, yards and touchdowns came out, which is what the panel is for.
+On a wide screen the team-context line sits beside the table rather than under
+it, so the table keeps a readable measure instead of stretching four number
+columns across the page.
+
+The donut survives on the **trends** page, where it shows a whole offense and
+there is no breakdown bar for it to duplicate.
+
+### League trends
+
+A **League trends** button on the garbage-time header opens `/garbagetime/trends`,
+the same relationship the 4th-down page has with its own trends view. It holds
+the two things that are about offenses rather than players:
+
+- **How much of each offense's season happened in one game state** — 32 bars in
+  one column, so they share a left edge and a reader can run an eye down them.
+  A **Game state** select switches between trailing, competitive and leading, and
+  reorders descending on whichever is picked. Bars carry each team's own colour:
+  colour follows the entity, and the band is already named in the heading and
+  shown in the select, so spending the bar on it would repeat what the reader has
+  been told twice and give up the cue that makes one team findable among
+  thirty-two. This moved off the player page, where it was an aside.
+
+  The three views cross-check each other: in 2025 the Jets lead trailing garbage
+  at 32.9% and sit last in leading at 0.0%, with Seattle the exact inverse.
+- **Team garbage time stats** — pick a team and get its points donut beside a
+  table of counting stats split four ways: **All, Trailing, Leading,
+  Competitive**. Every stat is conserved across the three bands, which the build-time
+  check asserts for all 32 offenses in every season.
+
+The team picker is **alphabetical**, because it is for finding a team you already
+have in mind and a list that reshuffles itself whenever the threshold moves is no
+use for that — the bar chart above is where the ranking lives. The *default*
+selection is a separate question and gets its own answer: the page opens on the
+offense that played the most garbage time.
+
+The trends page has **no "Remove points from total" control**. There is no
+Remaining column here for it to change, so it would be a control with no visible
+effect; this page describes the bands rather than subtracting them. The threshold
+slider, the scoring format and the season picker are shared with the player page.
+
+The team totals are the **whole offense**, not a sum of the players the rankings
+carry — the file holds only the top 120 per position, so summing those would
+quietly undercount. `scripts/garbage-time.R` therefore emits a stat line per team
+per bin alongside the play counts. Each event already knows which offense it
+happened for, so the player rows and the team rows come out of one attribution
+and cannot disagree.
+
+Teams keep both a `plays` count and a set of stat lines because they answer
+different questions: `plays` is the true snap count and the denominator for every
+rate, while the stat lines sum a snap across roles (a completion is an attempt
+and a target at once) and so cannot stand in for it.
+
+There are no verdict labels. Naming a player a "mirage" or "inflated" put a word
+on him that the data does not support: the same rank drop is produced by his own
+garbage time and by his position-mates', and a label cannot tell those apart
+while a rank change shown next to its two totals invites the reader to. The
+Δ Rank column and the breakdown bar say what happened; what to call it is the
+reader's.
+
+### About dialog
+
+The question-mark button, top right on both garbage-time pages, opens
+`GarbageAbout` — what counts as garbage time and why the two-score gate is
+there, the 74%/40% pass-rate asymmetry between the bands and what it would do to
+the page if left unsaid, how to read a rank that moved, and the sources.
+
+It is a **separate dialog from the 4th-down one**, which explains the nfl4th
+model. The two pages share no data, no model and no argument, and pointing a
+reader here at fourth-down methodology would answer a question nobody asked.
+
+Citations are the real ones, taken from `citation()` rather than written from
+memory: nflfastR (Carl & Baldwin) for the play-by-play and the `wp` model,
+nflreadr (Ho & Carl) for loading it and for the official player stats every
+season is reconciled against, and nflverse-data for the release assets. Every
+link is checked to resolve.
+
+There is deliberately no leaders panel for garbage time earned while ahead. The
+table sorts by Remaining and filters by position, which answers the same
+question without a second component that can drift from the first.
+
 ## About dialog
 
 The question-mark button, top right on both the picker and the team banner,
@@ -194,7 +497,7 @@ Every number in the interface traces to a field in the data or to one of these:
 | Game state | How live the game was, from the win probability carried by the model's own recommendation: *in doubt* inside 35–65%, *leaning* to 15/85, *lopsided* to 5/95, *decided* beyond it. |
 | Field zone | `yardline_100` 1–20 red zone, 21–40 opponent 40–21, 41–50 midfield, 51+ own half. |
 | Field goal distance | `yardline_100 + 17` — ten yards of end zone plus a seven-yard snap. Shown as context on the field-goal row; the model's own `fg_make_prob` is what is displayed beside it. |
-| Game result | `home_score` and `away_score` are the game's *final* score, not the running one. The extract restates them from the offence's side as `posteam_final_score` / `defteam_final_score`, so a team file says how each game ended with no second lookup. Rendered W/L/T from the viewed team's point of view, alongside `posteam_home` as vs/at. |
+| Game result | `home_score` and `away_score` are the game's *final* score, not the running one. The extract restates them from the offense's side as `posteam_final_score` / `defteam_final_score`, so a team file says how each game ended with no second lookup. Rendered W/L/T from the viewed team's point of view, alongside `posteam_home` as vs/at. |
 
 Win-probability fields are probabilities on a 0–1 scale. `go_boost` is the only field
 already expressed in percentage points.
@@ -368,3 +671,4 @@ colour filled it.
 | `npm run lint` | oxlint |
 | `npm run data:index` | rebuild `index.json` from real data |
 | `npm run data:fixture` | regenerate fixture data and rebuild `index.json` |
+| `npm run data:garbage:check` | validate `public/data/garbage/` through `src/lib` |

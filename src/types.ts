@@ -38,10 +38,10 @@ export interface Play {
   /** What the staff actually did. Mapped to a Choice by `actualChoice()`. */
   play_type: string | null
 
-  /** True when the offence was the home team in this game. */
+  /** True when the offense was the home team in this game. */
   posteam_home: boolean
   /**
-   * The game's *final* score, restated from the offence's side, so a team file
+   * The game's *final* score, restated from the offense's side, so a team file
    * can say how a game ended without a second lookup. Null only for a game
    * with no recorded result.
    */
@@ -145,3 +145,121 @@ export type PlayFacts = Omit<Play, 'desc'>
 
 /** A play in the quiz pool: the facts, with the outcome withheld. */
 export type QuizPlay = PlayFacts
+
+/* ---------------------------------------------------------------------------
+ * Garbage time: fantasy production binned by pre-snap win probability.
+ *
+ * The threshold that separates garbage time from football is a control in the
+ * browser, so the pipeline cannot emit totals at a fixed cut. It emits each
+ * player's counting stats bucketed into narrow win-probability bins instead,
+ * and the client cumulative-sums the bins below (or above) whatever the reader
+ * chose. See scripts/garbage-time.R.
+ * ------------------------------------------------------------------------- */
+
+/** Which end of the win-probability scale a bin sits at. */
+export type BinSide = 'trailing' | 'clean' | 'leading'
+
+/**
+ * One win-probability bucket, `lo` inclusive and `hi` exclusive.
+ *
+ * Exactly one bin has side 'clean'. It is the lump for everything between the
+ * two extremes *and* for every play that failed the two-score margin gate —
+ * which is fixed, and therefore applied in R rather than here. That is what
+ * keeps the threshold control honest: no setting can make a two-minute drill
+ * count as garbage.
+ */
+export interface GarbageBin {
+  lo: number
+  hi: number
+  side: BinSide
+}
+
+/**
+ * Column order of every StatLine. The file declares its own order and
+ * `assertStatOrder` checks it against this on load, because the order is the
+ * only contract the R script and this code share.
+ */
+export type StatKey =
+  | 'pass_att'
+  | 'pass_cmp'
+  | 'pass_yds'
+  | 'pass_td'
+  | 'int'
+  | 'rush_att'
+  | 'rush_yds'
+  | 'rush_td'
+  | 'tgt'
+  | 'rec'
+  | 'rec_yds'
+  | 'rec_td'
+  | 'fum_lost'
+  | 'two_pt_pass'
+  | 'two_pt_score'
+  | 'st_td'
+  | 'plays'
+
+/**
+ * Counting stats for one player in one bin, positionally encoded in StatKey
+ * order. A tuple rather than an object on purpose: repeating seventeen key
+ * names across ~4,600 bin rows would cost more bytes than the numbers do.
+ */
+export type StatLine = number[]
+
+/** `[bin index, stats]`. Sparse and ascending; empty bins are absent. */
+export type BinRow = [number, StatLine]
+
+export type FantasyPos = 'QB' | 'RB' | 'WR' | 'TE'
+
+export interface GarbagePlayer {
+  /** gsis_id. */
+  id: string
+  name: string
+  pos: FantasyPos
+  /** The team he took the most snaps for this season, not his current one. */
+  team: TeamAbbr
+  /** Games in which he was charged with an attempt, target or fumble. */
+  games: number
+  bins: BinRow[]
+}
+
+/**
+ * A team's offensive plays per bin: the opportunity denominator.
+ *
+ * A large garbage share means little on its own — a player on a team that spent
+ * a third of the season losing by four scores had far more chance to accumulate
+ * it. This is what lets the page say so instead of blaming the player.
+ */
+export interface GarbageTeam {
+  team: TeamAbbr
+  games: number
+  /**
+   * `[bin index, offensive plays]`. Sparse and ascending.
+   *
+   * The true snap count, and the denominator for every rate on the page. It is
+   * not derivable from `bins` below, which sums a snap across roles — a
+   * completion is an attempt and a target at once.
+   */
+  plays: [number, number][]
+  /** The whole offense's counting stats per bin, packed like a player's. */
+  bins: BinRow[]
+}
+
+export interface GarbageTimeFile {
+  generated_at: string
+  season: number
+  /** Highest regular-season week present, so an in-progress season says so. */
+  through_week: number
+  complete: boolean
+  /** Index matches every BinRow and GarbageTeam.plays index. */
+  bins: GarbageBin[]
+  /** Index of the single 'clean' lump bin. */
+  clean_bin: number
+  /** Points a team must trail or lead by before a play can count as garbage. */
+  margin: number
+  stats: StatKey[]
+  players: GarbagePlayer[]
+  teams: GarbageTeam[]
+}
+
+/** Seasons that passed the pipeline's reconciliation gate, descending. */
+export type GarbageSeasons = number[]

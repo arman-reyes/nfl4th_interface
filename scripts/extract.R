@@ -43,7 +43,7 @@ season_plays <- function(season) {
     nfl4th::add_4th_probs() |>
     filter(!is.na(posteam), !is.na(go_boost)) |>
     # home_score and away_score are the game's final scores, not the running
-    # ones; restated from the offence's side so a team file needs no lookup to
+    # ones; restated from the offense's side so a team file needs no lookup to
     # say how the game it is looking at ended.
     mutate(
       posteam_home = posteam == home_team,

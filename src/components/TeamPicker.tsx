@@ -1,6 +1,8 @@
 import type { TeamIndexEntry, TeamAbbr } from '../types'
+import type { ViewName } from '../lib/routes'
 import { teamSurface } from '../lib/color'
 import { AboutButton } from './AboutButton'
+import { SectionNav } from './SectionNav'
 
 interface Props {
   teams: TeamIndexEntry[]
@@ -10,6 +12,8 @@ interface Props {
   onAbout: () => void
   onTrends: () => void
   onQuiz: () => void
+  /** Switches statistical display, from the heading dropdown. */
+  onNavigate: (view: ViewName) => void
 }
 
 const CONFERENCES = ['AFC', 'NFC'] as const
@@ -17,14 +21,20 @@ const CONFERENCES = ['AFC', 'NFC'] as const
 const DIVISIONS = ['East', 'North', 'South', 'West'] as const
 
 /** Step one of the drill-down: whose 4th downs are we looking at. */
-export function TeamPicker({ teams, fixture, onSelect, onAbout, onTrends, onQuiz }: Props) {
+export function TeamPicker({
+  teams,
+  fixture,
+  onSelect,
+  onAbout,
+  onTrends,
+  onQuiz,
+  onNavigate,
+}: Props) {
   return (
     <div className="space-y-8">
       <div>
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            4th Down Stats
-          </h1>
+          <SectionNav current="teams" onNavigate={onNavigate} />
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={onTrends}

@@ -41,7 +41,7 @@ export function clock(secondsRemaining: number): string {
 /**
  * Field position the way a broadcast says it: whose half, and the yard line.
  * `yardline_100` counts down to the opponent's end zone, so it is the
- * defence's side below 50 and the offence's above it. Split into parts so the
+ * defense's side below 50 and the offense's above it. Split into parts so the
  * team abbreviation can be rendered as a coloured pill; `side` is null at
  * midfield, which belongs to neither.
  */

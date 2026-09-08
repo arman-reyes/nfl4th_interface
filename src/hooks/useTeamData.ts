@@ -1,6 +1,13 @@
 import { useCallback } from 'react'
 import { dataSource } from '../data/client'
-import type { LeagueIndex, Play, QuizPlay, TeamAbbr } from '../types'
+import type {
+  GarbageSeasons,
+  GarbageTimeFile,
+  LeagueIndex,
+  Play,
+  QuizPlay,
+  TeamAbbr,
+} from '../types'
 import { useAsync } from './useAsync'
 import type { AsyncState } from './useAsync'
 
@@ -23,4 +30,19 @@ export function useLeagueIndex(): AsyncState<LeagueIndex> {
 export function useQuizPool(): AsyncState<QuizPlay[]> {
   const load = useCallback(() => dataSource.loadQuizPool(), [])
   return useAsync<QuizPlay[]>('quiz', load)
+}
+
+/** The seasons the garbage-time pipeline published. Loaded on that page only. */
+export function useGarbageSeasons(): AsyncState<GarbageSeasons> {
+  const load = useCallback(() => dataSource.loadGarbageSeasons(), [])
+  return useAsync<GarbageSeasons>('garbage-seasons', load)
+}
+
+/**
+ * One season of binned fantasy production. Passing null fetches nothing, so the
+ * page can wait for the season list before asking for a year that may not exist.
+ */
+export function useGarbageTime(season: number | null): AsyncState<GarbageTimeFile> {
+  const load = useCallback((key: string) => dataSource.loadGarbageTime(Number(key)), [])
+  return useAsync<GarbageTimeFile>(season === null ? null : String(season), load)
 }

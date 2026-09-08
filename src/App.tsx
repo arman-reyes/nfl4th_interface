@@ -14,6 +14,9 @@ import { TeamSummary } from './components/TeamSummary'
 import { AboutDialog } from './components/AboutDialog'
 import { LeagueTrends } from './components/LeagueTrends'
 import { QuizPage } from './components/QuizPage'
+import { GarbageTimePage } from './components/GarbageTimePage'
+import { GarbageTrends } from './components/GarbageTrends'
+import { useRoute } from './hooks/useRoute'
 
 /**
  * The drill-down: team, season, week, quarter, then the individual 4th down.
@@ -25,9 +28,15 @@ import { QuizPage } from './components/QuizPage'
  * On a wide screen the list and the panel sit side by side. On a phone the
  * summary comes first and the list follows it, and selecting a play replaces
  * both.
+ *
+ * The top-level view comes from the URL so every page can be linked to and the
+ * back button works; everything below it — the team, the filters, the controls
+ * on the garbage-time page — stays in state, because those are a session rather
+ * than a place.
  */
 export default function App() {
   const index = useLeagueIndex()
+  const [view, navigate] = useRoute()
   const [abbr, setAbbr] = useState<TeamAbbr | null>(null)
   // What the user last asked for. The filter in force is derived from it during
   // render, because a team's real seasons and weeks are only known once that
@@ -35,8 +44,6 @@ export default function App() {
   const [intent, setIntent] = useState<PlayFilter | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [showTrends, setShowTrends] = useState(false)
-  const [showQuiz, setShowQuiz] = useState(false)
   const team = useTeamData(abbr)
 
   const meta = index.data?.teams.find((t) => t.team_abbr === abbr)
@@ -91,28 +98,44 @@ export default function App() {
   if (index.error) return <Centered tone="error">{index.error.message}</Centered>
   if (!index.data) return null
 
-  if (showQuiz) {
+  const about = (
+    <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+  )
+  const openAbout = () => setAboutOpen(true)
+  const toTeams = () => navigate('teams')
+
+  if (view === 'quiz') {
     return (
       <>
-        <QuizPage
-          index={index.data}
-          onBack={() => setShowQuiz(false)}
-          onAbout={() => setAboutOpen(true)}
-        />
-        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+        <QuizPage index={index.data} onBack={toTeams} onAbout={openAbout} />
+        {about}
       </>
     )
   }
 
-  if (showTrends) {
+  if (view === 'trends') {
     return (
       <>
-        <LeagueTrends
-          index={index.data}
-          onBack={() => setShowTrends(false)}
-          onAbout={() => setAboutOpen(true)}
-        />
-        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+        <LeagueTrends index={index.data} onBack={toTeams} onAbout={openAbout} />
+        {about}
+      </>
+    )
+  }
+
+  if (view === 'garbage') {
+    return (
+      <>
+        <GarbageTimePage onNavigate={navigate} onTrends={() => navigate('garbageTrends')} />
+        {about}
+      </>
+    )
+  }
+
+  if (view === 'garbageTrends') {
+    return (
+      <>
+        <GarbageTrends onNavigate={navigate} onBack={() => navigate('garbage')} />
+        {about}
       </>
     )
   }
@@ -124,11 +147,12 @@ export default function App() {
           teams={index.data.teams}
           fixture={index.data.fixture}
           onSelect={chooseTeam}
-          onAbout={() => setAboutOpen(true)}
-          onTrends={() => setShowTrends(true)}
-          onQuiz={() => setShowQuiz(true)}
+          onAbout={openAbout}
+          onTrends={() => navigate('trends')}
+          onQuiz={() => navigate('quiz')}
+          onNavigate={navigate}
         />
-        <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+        {about}
       </main>
     )
   }
@@ -147,11 +171,11 @@ export default function App() {
         plays={seasonCount}
         onChangeSeason={changeSeason}
         onChangeTeam={() => setAbbr(null)}
-        onAbout={() => setAboutOpen(true)}
-        onTrends={() => setShowTrends(true)}
+        onAbout={openAbout}
+        onTrends={() => navigate('trends')}
       />
 
-      <AboutDialog open={aboutOpen} index={index.data} onClose={() => setAboutOpen(false)} />
+      {about}
 
       <main className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0">
         {team.loading && <Centered>Loading {abbr}…</Centered>}
