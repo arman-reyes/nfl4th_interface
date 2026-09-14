@@ -138,6 +138,51 @@ commented where it sits. The ones worth knowing about:
   kickoff recovered in the end zone by the kicking team counts, a muffed punt
   recovered the same way does not.
 
+### Travel
+
+A third pipeline, and the lightest: no play-by-play. `scripts/travel.R` reads
+the schedule, the per-game team stats and the per-game player stats — all of
+which nflreadr publishes per game and joins on `game_id` — and writes one file
+per season with every team-game and how far the team went to play it.
+
+```bash
+Rscript scripts/travel.R                  # SEASONS at the top of the file
+Rscript scripts/travel.R 2016:2025        # or a range on the command line
+npm run data:travel                       # stage 2: league.json + checks
+```
+
+Each season takes well under a minute. It writes `public/data/travel/{season}.json`
+(~300 KB each, ~70 KB gzipped) plus `seasons.json`, and stage 2 writes
+`league.json` (~400 KB, ~95 KB gzipped),
+the aggregate of every season, by running `aggregate()` from `src/lib/travel.ts`
+— the same function the page runs on a single season file — so the all-seasons
+view and a season view are the same arithmetic on different inputs.
+
+**What the schedule does not carry** is where a venue is. `scripts/venues.csv`
+is a hand-curated table of latitude, longitude and IANA time zone for every
+`stadium_id` that has hosted a regular-season game since 1999 — 62 of them, from
+the Kingdome to Arena Corinthians — and the script stops with a list of unknown
+ids rather than emit a row with no coordinates. Time zones are IANA names rather
+than offsets so that daylight saving, Arizona, and Indiana before 2006 come out
+of the tz database instead of a table of exceptions.
+
+**A team's home base** is the venue it played most of its home games in that
+season, which makes relocations (STL → LA, SD → LAC, OAK → LV), the 2005 Saints
+in Baton Rouge and the Bills' Toronto games facts of the year rather than
+special cases. Distance is the great-circle distance from there. The schedule's
+team codes are the codes of the day and the stat tables use the franchise's
+current one, so both are run through `nflreadr::clean_team_abbrs()`.
+
+**The gate.** Every game must have a final score, a closing spread and both
+teams' rest days (all of which 1999–2025 does); every team must have a base
+holding at least half its home games; and at most 4% of team-games may lack an
+offensive stat line. That last number is set by the source: nflverse has no
+Jaguars row for their 2001 and 2002 home games, and the visitor's row in those
+games carries both teams' plays lumped together, so a game missing either side
+has its offence nulled on both. Those games keep their result, line and player
+rows; they drop out of the offensive columns only. 1999 has no kickoff times,
+so it ships with `has_kickoff: false` and no body-clock rows.
+
 ## League trends
 
 A second view, reached from the header on either screen. Four metrics across
@@ -537,6 +582,162 @@ There is deliberately no leaders panel for garbage time earned while ahead. The
 table sorts by Remaining and filters by position, which answers the same
 question without a second component that can drift from the first.
 
+## Travel impact
+
+A page at `/travel` asking whether playing away — and how far away — changes
+what a team and its players do. Home teams win more, and by how much is the
+first number on the page; the question is whether, once a team has left home,
+going further costs anything more.
+
+**Both sides of every game are in the data.** A team-game is one row from one
+team's side, so the league-wide margin sums to zero by construction and every
+away deficit is some home team's edge. This is also why the longest distance
+bin can show a margin of exactly zero: international games put both teams in
+it, and one's win is the other's loss.
+
+**Six lenses** bucket the trips: distance (home, then seven bins from under
+250 miles to 3,000 and over), time zones crossed (signed, so three zones west
+and three east are different rows), body clock (the scheduled kickoff on the
+team's home clock — a 1pm Eastern kickoff is 10am to a Pacific team), rest
+(short week, regular week, extra rest, split by home and away), season phase
+(weeks 1–4, 5–13, and the last month split by the line), and era (three eras
+at a fixed 1,500-mile cut, since the bins are summed at build time and the
+slider cannot reach them). Home is bin 0 of every lens so the reference row is
+always in view.
+
+**A far threshold** sits under the lens. It snaps to the distance bin edges,
+because a cut inside a bin cannot be answered by summing bins, and it sets the
+"far" column everywhere — the headline tile, the team table and the player
+table — so a reader can move it and watch all three follow. The lens changes
+the trip table only.
+
+### Why a raw away number cannot answer the question
+
+Teams do not travel at random: the four Pacific-zone teams fly further and
+cross more zones than anyone in every season, so a table of results by distance
+is partly a table of how those four did. And a good team wins on the road too.
+
+The **vs Line** column is the control. The closing spread already prices both
+teams and the home field, so the margin against it asks whether teams that
+travelled far did *worse than expected*. If the market already knows that long
+trips cost something, the raw margin shows it and the vs-line margin does not —
+the gap between the two columns is itself the finding. Over 1999–2025 the raw
+margin on trips of 1,000+ miles is −2.4 ± 0.3 against +2.3 at home; against the
+line it is −0.2 ± 0.3. The line has it priced. The one bin that stands out is
+kickoffs at 10am or earlier on the team's own clock: −0.8 ± 0.5 against the
+line, the worst of any body-clock bin, which is the effect the literature
+describes.
+
+### What stands out
+
+The tables alone did not say much, so the page leads with the bins that do.
+`standouts()` in `src/lib/travel.ts` walks every bin of every lens and keeps
+those whose margin against the line is at least two standard errors from zero
+over at least thirty team-games, most extreme first. It is computed from
+whatever is loaded, so a single season usually shows nothing and the empty
+state says why.
+
+Each standout carries a **within-team** figure: the same teams' trips of that
+kind against their own other trips, weighted by inverse variance across the
+teams with at least ten of them. This is the check that a bin is not just the
+teams that fill it — the two-zones-east bin is seven Western teams — and it
+needs a per-team, per-lens cell of margin vs. line (`TeamSplit.lensVsLine`),
+which is why the aggregate carries one.
+
+Over 1999–2025 four things pass, and all four hold within-team:
+
+| Bin | vs line | within-team | n |
+|---|---|---|---|
+| Two time zones east | −2.5 ± 0.6 | −2.9 ± 0.8, 7 of 7 teams negative | 436 |
+| Road underdog, weeks 14+ | −1.2 ± 0.4 | −1.1 ± 0.4 | 1,141 |
+| 1,500+ miles, 1999–2010 | −1.5 ± 0.6 | −1.4 ± 0.6 | 598 |
+| 1,500–2,000 miles | −1.2 ± 0.5 | −0.9 ± 0.6 | 710 |
+
+The first is the finding. Pacific teams in the Central zone and Mountain
+teams in the Eastern lose to the line by two and a half points, in every era
+(shrinking: −3.4 before 2006, −1.3 since 2020) and only on kickoffs before
+2pm on the body clock — afternoon and night kickoffs in the same bin sit on
+the line. Three zones east, the trip everyone prepares for, is priced (+0.8),
+and Pacific teams in the Mountain zone beat the line by 3.6. The plausible
+story is that a cross-country trip is treated as an event and a two-zone trip
+as routine. The third says distance itself *was* underpriced and is not any
+more: the same far trips since 2020 beat the line by 1.1. The fourth is
+mostly the first, seen through a different lens.
+
+A one-line reading sits under each standout. Those readings are keyed on the
+bin's label and shown only when that bin qualifies, so a claim is never
+printed for data that has stopped supporting it.
+
+### The home edge, season by season
+
+Two small panels, drawn with the trends page's axis helpers: the home margin
+by season, and the same against the line, each with a one-standard-error
+band. The contrast is the point. The raw edge has moved — +2.6 before 2009,
+near zero in 2019–2021 (2020 was played without crowds), about +2 since —
+while the edge against the line has stayed at zero, which is the market
+moving with it. Shown only when three or more seasons are loaded.
+
+The mechanism, for the record: over all 13,900 team-games the visitor takes
+0.37 more penalties, 3 more penalty yards, 0.14 more sacks and 0.07 more
+turnovers per game, and gains 12 fewer yards. The flag gap does not grow with
+distance (6.42 per game on short trips, 6.59 on far ones), which argues for
+the crowd and the officials over fatigue.
+
+### Reading the errors
+
+Every mean carries **± one standard error** from the games in it. This is the
+one place on the site that draws error bars, and it is allowed because they
+are not invented: the 4th-down page shows a model's point estimates and has
+nothing honest to put around them, while these are averages over games that
+happened. The 4th-down page's rule stands; this page is the case it does not
+cover.
+
+A single game has a standard deviation near fourteen points of margin, so a
+bin of a hundred games has an error near 1.4, and a single-season bin of a
+dozen far trips cannot resolve anything smaller than a touchdown. That is why
+the **all-seasons aggregate is the resting state** and a season is a
+drill-down — the far bins are only large enough to read in the aggregate.
+`league.json` is one request; picking a season fetches that season's file.
+
+### The three tables
+
+- **Results by lens** — one row per bin, then two summary rows, every trip and
+  the far trips, which do not move with the lens so the reference lines stay
+  in view. Columns: win rate, margin (with a bar either side of zero), margin
+  vs line, cover rate, EPA per play, yards, turnovers, penalties. The error is
+  printed inline on the two columns the argument rests on and on hover
+  elsewhere. A bin with no games — no international trip that season — is
+  absent rather than a row of dashes.
+- **Teams** — home and away by the *schedule's* designation, because a team's
+  home and road records are the split a reader already knows and will check
+  the table against; then home margin vs. line — whether the stadium beats
+  the market (Baltimore +3.0 over 27 years, Washington −2.0; Denver's altitude
+  is worth 3.9 raw and exactly 0.0 against the line) — and the far column on
+  the distance cut like everything else. Sorted by away minus home by default:
+  the teams that lose the most by leaving. Miles are per season from that
+  season's base, so a team that moved is not charged for its old geography.
+- **Players** — QB/RB/WR/TE points per game at home, away and on far trips,
+  with the position's own split and error on a line above them, because a
+  single player's split is a handful of games either way and the position is
+  the number to read first. The file keeps the top 150 at each position by
+  total points; the table shows those with eight games and at least one on
+  each side. The key counting stat sits at the end, home → away.
+
+Signed differences are red for worse and green for better, using the middle
+step of the garbage-time rank ramp (`src/components/travel/signTone.ts`), and
+every one carries an arrow and its sign so colour is never the only signal.
+There is no magnitude ramp because a difference of means has no natural steps
+the way a rank move does; the error beside it says how much to make of it.
+
+### About dialog
+
+The question-mark button opens `TravelAbout`: what is measured and how the
+base, distance, zones and body clock are defined; why a raw away number is
+confounded and what the line does about it; how to read the errors; the bins;
+and the sources — nflreadr's `load_schedules()`, `load_team_stats()` and
+`load_player_stats()`, with the venue table's provenance stated as this
+repository's own.
+
 ## About dialog
 
 The question-mark button, top right on both the picker and the team banner,
@@ -737,3 +938,4 @@ colour filled it.
 | `npm run data:index` | rebuild `index.json` from real data |
 | `npm run data:fixture` | regenerate fixture data and rebuild `index.json` |
 | `npm run data:garbage:check` | validate `public/data/garbage/` through `src/lib` |
+| `npm run data:travel` | validate `public/data/travel/` and write `league.json` |

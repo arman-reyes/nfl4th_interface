@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { pathFor, SECTIONS, sectionOf, viewAt } from '../routes'
 import type { ViewName } from '../routes'
 
-const VIEWS: ViewName[] = ['teams', 'trends', 'quiz', 'garbage', 'garbageTrends']
+const VIEWS: ViewName[] = ['teams', 'trends', 'quiz', 'garbage', 'garbageTrends', 'travel']
 
 describe('routes', () => {
   it('round-trips every view', () => {
@@ -32,7 +32,7 @@ describe('routes', () => {
 
 describe('sections', () => {
   it('lists the statistical displays, 4th downs first', () => {
-    expect(SECTIONS.map((s) => s.view)).toEqual(['teams', 'garbage'])
+    expect(SECTIONS.map((s) => s.view)).toEqual(['teams', 'garbage', 'travel'])
   })
 
   it('gives every section a real route', () => {

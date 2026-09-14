@@ -16,6 +16,7 @@ import { LeagueTrends } from './components/LeagueTrends'
 import { QuizPage } from './components/QuizPage'
 import { GarbageTimePage } from './components/GarbageTimePage'
 import { GarbageTrends } from './components/GarbageTrends'
+import { TravelPage } from './components/TravelPage'
 import { useRoute } from './hooks/useRoute'
 
 /**
@@ -135,6 +136,15 @@ export default function App() {
     return (
       <>
         <GarbageTrends onNavigate={navigate} onBack={() => navigate('garbage')} />
+        {about}
+      </>
+    )
+  }
+
+  if (view === 'travel') {
+    return (
+      <>
+        <TravelPage onNavigate={navigate} />
         {about}
       </>
     )

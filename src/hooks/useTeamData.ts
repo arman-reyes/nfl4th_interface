@@ -7,7 +7,10 @@ import type {
   Play,
   QuizPlay,
   TeamAbbr,
+  TravelSeasonFile,
+  TravelSeasons,
 } from '../types'
+import type { TravelLeagueFile } from '../lib/travel'
 import { useAsync } from './useAsync'
 import type { AsyncState } from './useAsync'
 
@@ -45,4 +48,22 @@ export function useGarbageSeasons(): AsyncState<GarbageSeasons> {
 export function useGarbageTime(season: number | null): AsyncState<GarbageTimeFile> {
   const load = useCallback((key: string) => dataSource.loadGarbageTime(Number(key)), [])
   return useAsync<GarbageTimeFile>(season === null ? null : String(season), load)
+}
+
+/** The seasons the travel pipeline published. Loaded on that page only. */
+export function useTravelSeasons(): AsyncState<TravelSeasons> {
+  const load = useCallback(() => dataSource.loadTravelSeasons(), [])
+  return useAsync<TravelSeasons>('travel-seasons', load)
+}
+
+/** One season of trips. Null fetches nothing, which is the all-seasons view. */
+export function useTravelSeason(season: number | null): AsyncState<TravelSeasonFile> {
+  const load = useCallback((key: string) => dataSource.loadTravelSeason(Number(key)), [])
+  return useAsync<TravelSeasonFile>(season === null ? null : String(season), load)
+}
+
+/** Every season at once, precomputed. Loaded once; it is the page's first view. */
+export function useTravelLeague(): AsyncState<TravelLeagueFile> {
+  const load = useCallback(() => dataSource.loadTravelLeague(), [])
+  return useAsync<TravelLeagueFile>('travel-league', load)
 }

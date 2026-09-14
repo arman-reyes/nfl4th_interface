@@ -274,3 +274,112 @@ export interface GarbageTimeFile {
 
 /** Seasons that passed the pipeline's reconciliation gate, descending. */
 export type GarbageSeasons = number[]
+
+/* ---------------------------------------------------------------------------
+ * Travel: every regular-season team-game with how far the team went to play
+ * it, what happened, and what its skill players did there.
+ *
+ * No thresholds are baked in. The client bins each game by whichever lens the
+ * reader picked (distance, time zones, body clock, rest) and sums the games
+ * under it, so one file per season answers every setting. See scripts/travel.R.
+ * ------------------------------------------------------------------------- */
+
+/** Where the team stood in the schedule. Neutral means both teams travelled. */
+export type TravelSite = 'home' | 'away' | 'neutral'
+
+/**
+ * Column order of every player game row after the game index. The file
+ * declares its own order and `assertStatOrder` checks it on load.
+ */
+export type TravelStatKey =
+  | 'pts_std'
+  | 'rec'
+  | 'pass_yds'
+  | 'pass_td'
+  | 'int'
+  | 'rush_yds'
+  | 'rush_td'
+  | 'rec_yds'
+  | 'rec_td'
+
+export interface TravelVenue {
+  /** nflverse stadium_id. */
+  id: string
+  name: string
+  lat: number
+  lon: number
+  /** ISO 3166 alpha-2. */
+  country: string
+}
+
+/** The venue a team played most of its home games in that season. */
+export interface TravelBase {
+  team: TeamAbbr
+  venue: string
+  name: string
+}
+
+/** One team's side of one game. */
+export interface TeamGame {
+  game_id: string
+  week: number
+  team: TeamAbbr
+  opp: TeamAbbr
+  site: TravelSite
+  venue: string
+  /** Great-circle miles from the team's home base that season. Zero at home. */
+  miles: number
+  /** Venue UTC offset minus home UTC offset on the day. Positive = travelled east. */
+  tz: number
+  /** Kickoff hour on the team's home clock, decimal. Null where the schedule has no time (1999). */
+  body_hour: number | null
+  /** Days since the team's last game, and the opponent's. */
+  rest: number
+  opp_rest: number
+  weekday: string
+  pf: number
+  pa: number
+  /** Closing spread from this team's side: positive means it was favoured by that much. */
+  line: number
+  /** Offence, from nflverse team stats. Null on the rare game the source has no line for. */
+  pass_yds: number | null
+  rush_yds: number | null
+  /** Pass attempts + carries + sacks. */
+  plays: number | null
+  /** Passing EPA + rushing EPA. */
+  epa: number | null
+  /** Interceptions + fumbles lost. */
+  turnovers: number | null
+  penalties: number | null
+  pen_yds: number | null
+  sacks: number | null
+}
+
+/** `[index into games, ...stats in TravelStatKey order]`. */
+export type PlayerGameRow = number[]
+
+export interface TravelPlayer {
+  /** gsis_id. */
+  id: string
+  name: string
+  pos: FantasyPos
+  /** The team of his last game that season. */
+  team: TeamAbbr
+  rows: PlayerGameRow[]
+}
+
+export interface TravelSeasonFile {
+  generated_at: string
+  season: number
+  /** False for 1999, where the schedule carries no kickoff times. */
+  has_kickoff: boolean
+  stats: TravelStatKey[]
+  /** Only the venues used this season. */
+  venues: TravelVenue[]
+  bases: TravelBase[]
+  games: TeamGame[]
+  players: TravelPlayer[]
+}
+
+/** Seasons the travel pipeline published, descending. */
+export type TravelSeasons = number[]

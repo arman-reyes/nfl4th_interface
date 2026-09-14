@@ -1,12 +1,12 @@
 /**
- * The four places this site has, and the URLs they live at.
+ * The places this site has, and the URLs they live at.
  *
  * Pure and DOM-free so it can be tested without a browser, and so `useRoute`
  * stays small enough to read in one go. There is exactly one level of routing
  * and no parameters, which is why there is no router library here.
  */
 
-export type ViewName = 'teams' | 'trends' | 'quiz' | 'garbage' | 'garbageTrends'
+export type ViewName = 'teams' | 'trends' | 'quiz' | 'garbage' | 'garbageTrends' | 'travel'
 
 /** '/' must be the teams entry: it is where an unrecognised path lands. */
 const PATHS: Record<ViewName, string> = {
@@ -15,6 +15,7 @@ const PATHS: Record<ViewName, string> = {
   quiz: '/quiz',
   garbage: '/garbagetime',
   garbageTrends: '/garbagetime/trends',
+  travel: '/travel',
 }
 
 // Optional-chained so this module can be imported from a plain node script
@@ -73,6 +74,11 @@ export const SECTIONS: Section[] = [
     view: 'garbage',
     title: 'Garbage Time',
     blurb: 'Fantasy rankings with the plays that happened after the game was decided taken out.',
+  },
+  {
+    view: 'travel',
+    title: 'Travel Impact Stats',
+    blurb: 'Does playing away — and how far away — change what a team and its players do?',
   },
 ]
 
