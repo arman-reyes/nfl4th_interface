@@ -1,5 +1,6 @@
 import type { TeamIndexEntry } from '../types'
 import { teamSurface } from '../lib/color'
+import { weekLongLabel } from '../lib/filters'
 import { AboutButton } from './AboutButton'
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   season: number
   seasons: number[]
   plays: number
+  /** The latest week in the data when the shown season is still being played. */
+  throughWeek?: number | null
   onChangeSeason: (season: number) => void
   onChangeTeam: () => void
   onAbout: () => void
@@ -26,6 +29,7 @@ export function TeamBanner({
   season,
   seasons,
   plays,
+  throughWeek = null,
   onChangeSeason,
   onChangeTeam,
   onAbout,
@@ -73,6 +77,9 @@ export function TeamBanner({
         </div>
         <span className="min-w-0 flex-1 truncate text-sm font-medium opacity-70 sm:text-base">
           {plays} fourth downs
+          {throughWeek !== null && (
+            <span className="opacity-80"> · in progress, through {weekLongLabel(season, throughWeek)}</span>
+          )}
         </span>
         <button
           onClick={onTrends}

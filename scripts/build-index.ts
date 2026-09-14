@@ -20,7 +20,15 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { summarizeAll } from '../src/lib/metrics.ts'
 import { actualChoice } from '../src/lib/decision.ts'
-import type { LeagueIndex, Play, QuizPlay, TeamIndexEntry, TeamMeta } from '../src/types.ts'
+import { postseasonRound } from '../src/lib/filters.ts'
+import type {
+  LeagueIndex,
+  Play,
+  QuizPlay,
+  SeasonProgress,
+  TeamIndexEntry,
+  TeamMeta,
+} from '../src/types.ts'
 
 const INDEX_PATH = 'public/data/index.json'
 const QUIZ_PATH = 'public/data/quiz.json'
@@ -60,7 +68,8 @@ function readTeamMeta(): TeamMeta[] {
 
 const meta = readTeamMeta()
 const teams: TeamIndexEntry[] = []
-const seasons = new Set<number>()
+/** Latest week seen per season, across every team. */
+const lastWeek = new Map<number, number>()
 const quizCandidates: Play[] = []
 
 for (const team of meta) {
@@ -70,7 +79,9 @@ for (const team of meta) {
     continue
   }
   const plays = JSON.parse(readFileSync(path, 'utf-8')) as Play[]
-  for (const play of plays) seasons.add(play.season)
+  for (const play of plays) {
+    lastWeek.set(play.season, Math.max(lastWeek.get(play.season) ?? 0, play.week))
+  }
   // Only plays that carried a real decision can be asked about.
   quizCandidates.push(...plays.filter((p) => actualChoice(p) !== null))
   const summaries = summarizeAll(plays)
@@ -84,24 +95,43 @@ for (const team of meta) {
   )
 }
 
+const seasons = [...lastWeek.keys()].sort((a, b) => b - a)
+
+// The newest season is still being played until a Super Bowl play is in the
+// data. Someone always has a 4th down in the Super Bowl, so the union of the
+// team files sees it the week it happens.
+const newest = seasons[0]
+const inProgress: SeasonProgress | null =
+  newest !== undefined && postseasonRound(newest, lastWeek.get(newest) ?? 0) !== 3
+    ? { season: newest, through_week: lastWeek.get(newest) ?? 0 }
+    : null
+
 const index: LeagueIndex = {
   generated_at: new Date().toISOString(),
-  seasons: [...seasons].sort((a, b) => b - a),
+  seasons,
   fixture: isFixture,
+  in_progress: inProgress,
   teams: teams.sort((a, b) => a.team_abbr.localeCompare(b.team_abbr)),
 }
 
 writeFileSync(INDEX_PATH, JSON.stringify(index))
 
 // The quiz pool: a uniform random sample of real 4th downs, minus the play
-// description, which narrates the outcome the quiz must not reveal.
-const pool: QuizPlay[] = seededShuffle(quizCandidates, 20260830)
+// description, which narrates the outcome the quiz must not reveal. The
+// season in progress stays out: the shuffle is seeded over the whole
+// candidate list, so adding a week's plays would deal a different quiz every
+// week of the season. Its plays join the pool once the season is complete.
+const completed = quizCandidates.filter((p) => p.season !== inProgress?.season)
+const pool: QuizPlay[] = seededShuffle(completed, 20260830)
   .slice(0, QUIZ_POOL)
   .map(({ desc: _desc, ...rest }) => rest)
 writeFileSync(QUIZ_PATH, JSON.stringify(pool))
-process.stdout.write(`Wrote ${QUIZ_PATH}: ${pool.length} of ${quizCandidates.length} decisions
-`)
+process.stdout.write(
+  `Wrote ${QUIZ_PATH}: ${pool.length} of ${completed.length} decisions` +
+    `${inProgress ? ` (${quizCandidates.length - completed.length} from ${inProgress.season} held back)` : ''}\n`,
+)
 process.stdout.write(
   `\nWrote ${INDEX_PATH}: ${teams.length} teams, seasons ${index.seasons.at(-1)}-${index.seasons[0]}` +
+    `${inProgress ? ` (${inProgress.season} in progress, through week ${inProgress.through_week})` : ''}` +
     `${isFixture ? ' (FIXTURE DATA)' : ''}\n`,
 )

@@ -2,9 +2,14 @@
 # stat from play-by-play, bucketed by the win probability the offense faced when
 # the play was snapped.
 #
-#   Rscript scripts/garbage-time.R              # SEASONS below
+#   Rscript scripts/garbage-time.R              # the current season
 #   Rscript scripts/garbage-time.R 2016:2025    # or a range / list on the CLI
 #   npm run data:garbage:check                  # stage 2, sanity-prints the output
+#
+# Each season is its own file and seasons.json is rebuilt from the directory,
+# so a run touches only the seasons it was given; a midseason top-up is a
+# single-season run. The script exits non-zero if any requested season failed
+# reconciliation, and leaves whatever file that season had before in place.
 #
 # Why bin rather than emit totals: the threshold that separates garbage time
 # from football is a control in the browser, so no single cut can be baked in.
@@ -22,6 +27,7 @@
 #
 # Set GT_CACHE to a directory to cache each season's play-by-play as .rds, which
 # makes a multi-season backfill resumable. Without it every season re-downloads.
+# The current season is never cached: its play-by-play changes every week.
 
 library(nflreadr)   # 1.5.1
 library(dplyr)
@@ -33,7 +39,7 @@ library(jsonlite)
 # seasons have thinner player-id coverage, so rather than guess where the data
 # becomes trustworthy we run them and let the reconciliation gate below decide:
 # a season that cannot rebuild nflverse's own fantasy totals does not ship.
-SEASONS <- 2025
+SEASONS <- nflreadr::most_recent_season()
 
 MARGIN    <- 9      # points behind (or ahead) before a play can count as garbage
 BIN_W     <- 0.025  # bin width across the extremes
@@ -122,23 +128,28 @@ bin_table <- function() {
   c(low, list(list(lo = 0, hi = 1, side = "clean")), high)
 }
 
-season_pbp <- function(season) {
+# The cache file for a season, or "" when the season must not be cached: no
+# GT_CACHE, or a season still being played, whose data is stale by next week.
+cache_file <- function(season, kind) {
   cache <- Sys.getenv("GT_CACHE", "")
-  if (nzchar(cache)) {
-    f <- file.path(cache, sprintf("pbp_%d.rds", season))
-    if (file.exists(f)) return(readRDS(f))
-    d <- nflreadr::load_pbp(season) |> filter(season_type == "REG")
-    dir.create(cache, recursive = TRUE, showWarnings = FALSE)
+  if (!nzchar(cache) || season >= nflreadr::most_recent_season()) return("")
+  file.path(cache, sprintf("%s_%d.rds", kind, season))
+}
+
+season_pbp <- function(season) {
+  f <- cache_file(season, "pbp")
+  if (nzchar(f) && file.exists(f)) return(readRDS(f))
+  d <- nflreadr::load_pbp(season) |> filter(season_type == "REG")
+  if (nzchar(f)) {
+    dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
     saveRDS(d, f)
-    return(d)
   }
-  nflreadr::load_pbp(season) |> filter(season_type == "REG")
+  d
 }
 
 season_participation <- function(season) {
   if (season < FIRST_PARTICIPATION) return(NULL)
-  cache <- Sys.getenv("GT_CACHE", "")
-  f <- if (nzchar(cache)) file.path(cache, sprintf("part_%d.rds", season)) else ""
+  f <- cache_file(season, "part")
   if (nzchar(f) && file.exists(f)) return(readRDS(f))
   d <- tryCatch(
     nflreadr::load_participation(season) |>
@@ -146,7 +157,7 @@ season_participation <- function(season) {
     error = function(e) NULL
   )
   if (!is.null(d) && nzchar(f)) {
-    dir.create(cache, recursive = TRUE, showWarnings = FALSE)
+    dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
     saveRDS(d, f)
   }
   d
@@ -350,7 +361,7 @@ build_season <- function(season) {
   # produces the player rows and the team rows and the two cannot disagree.
   snaps <- snap_rows(pbp, season)
   message("  ", nrow(snaps), " player-bin snap rows",
-          if (nrow(snaps) == 0) " (no participation data this far back)" else "")
+          if (nrow(snaps) == 0) " (no participation data for this season)" else "")
   ev_team <- bind_rows(events(pbp), st_rows(pbp, ps), snaps) |>
     group_by(id, team, bin) |> summarise(across(everything(), \(x) sum(z(x))), .groups = "drop")
   ev <- ev_team |> group_by(id, bin) |>
@@ -440,12 +451,19 @@ build_season <- function(season) {
       )
     })
 
+  # Complete means every regular-season game has a result, read from the
+  # schedule rather than inferred from the last week seen: the regular season
+  # was 17 weeks through 2020 and 18 since, and midweek the newest week is
+  # only partly played.
   weeks <- sort(unique(pbp$week))
+  reg <- nflreadr::load_schedules(season) |> filter(game_type == "REG")
+  complete <- nrow(reg) > 0 && all(!is.na(reg$result))
+  message("  through week ", max(weeks), if (complete) " (season complete)" else " (season in progress)")
   out <- list(
     generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
     season = season,
     through_week = max(weeks),
-    complete = max(weeks) >= 17,
+    complete = complete,
     has_snaps = nrow(snaps) > 0,
     bins = bin_table(),
     clean_bin = CLEAN_BIN,
@@ -480,4 +498,5 @@ write_json(sort(existing, decreasing = TRUE), "public/data/garbage/seasons.json"
 message("\nWrote public/data/garbage/. Shipped: ", paste(sort(existing, decreasing = TRUE), collapse = ", "))
 if (length(done) < length(SEASONS)) {
   message("Failed reconciliation: ", paste(setdiff(SEASONS, done), collapse = ", "))
+  quit(save = "no", status = 1)
 }

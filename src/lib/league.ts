@@ -84,9 +84,7 @@ function quantile(sorted: number[], p: number): number {
  * together or came apart, and these teams did not move together.
  */
 export function seasonSpreads(index: LeagueIndex, metric: LeagueMetric): SeasonSpread[] {
-  const seasons = [...index.seasons].sort((a, b) => a - b)
-
-  return seasons
+  return leagueSeasons(index)
     .map((season) => {
       const values = index.teams
         .map((team) => team.summaries.find((s) => s.season === season))
@@ -133,9 +131,13 @@ export function movement(spreads: SeasonSpread[]): Movement | null {
   return { first, last, change: last.p50 - first.p50 }
 }
 
-/** The seasons in the index, oldest first, which is how a trend reads. */
+/**
+ * The completed seasons in the index, oldest first, which is how a trend
+ * reads. A season still being played is left out: a week or two of games is
+ * not a season's tendency, and as the last point it would set the headline.
+ */
 export function leagueSeasons(index: LeagueIndex): number[] {
-  return [...index.seasons].sort((a, b) => a - b)
+  return index.seasons.filter((s) => s !== index.in_progress?.season).sort((a, b) => a - b)
 }
 
 export function recordLabel(summary: TeamSummary): string {

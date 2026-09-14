@@ -121,6 +121,9 @@ export function AboutDialog({ open, index, onClose }: Props) {
               month: 'long',
               day: 'numeric',
             })}
+            {index.in_progress
+              ? ` — ${index.in_progress.season} season in progress, through week ${index.in_progress.through_week}`
+              : ''}
             {index.fixture ? ' — from fixture data, not model output' : ''}
           </P>
         </Section>

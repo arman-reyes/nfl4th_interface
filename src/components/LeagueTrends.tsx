@@ -58,7 +58,7 @@ export function LeagueTrends({ index, onBack, onAbout }: Props) {
 
       {aggressiveness && saidGo && (
         <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm leading-relaxed text-stone-600 shadow-xs sm:p-5">
-          Across these twelve seasons the median team went from going for it on{' '}
+          Across these {seasons.length} seasons the median team went from going for it on{' '}
           <strong className="tnum font-semibold text-stone-900">
             {(aggressiveness.first.p50 * 100).toFixed(0)}%
           </strong>{' '}

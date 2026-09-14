@@ -24,13 +24,16 @@ Three stages, two of which you run yourself.
 `public/data/teams/` plus the raw team metadata to `public/data/index.json`.
 
 ```bash
-Rscript scripts/extract.R    # ~50 minutes for 2014-2025
+Rscript scripts/extract.R         # every season, 2014 to the current one: ~50 minutes
+Rscript scripts/extract.R 2026    # one season, merged into the team files: ~4 minutes
 ```
 
 Needs R with `nfl4th`, `nflreadr`, `dplyr`, `purrr` and `jsonlite`. Seasons are
 processed one at a time and reduced to 4th downs immediately, because a full
-play-by-play frame for twelve seasons does not want to be in memory at once. The
-current data is 49,416 fourth downs across all 32 teams, 2014-2025.
+play-by-play frame for twelve seasons does not want to be in memory at once.
+Whatever seasons were asked for replace their rows in each team file and every
+other season is kept, so a single-season run cannot lose the rest. The data
+through 2025 is 49,416 fourth downs across all 32 teams.
 
 2014 is the floor: `load_4th_pbp()` refuses anything earlier and the precomputed
 release assets start there. nflreadr standardises historical team codes on the
@@ -44,6 +47,36 @@ teams. It is idempotent: run it as many times as you like.
 
 **3. The app** loads `index.json` once at startup and fetches a team's play file only
 when that team is selected.
+
+### Keeping up with the season
+
+```bash
+npm run data:update                     # current season, both pipelines
+npm run data:update -- --season 2026    # a specific season
+npm run data:update -- --deploy         # ...and push the data to S3
+npm run data:update -- --only garbage   # one pipeline: fourth | garbage
+```
+
+`scripts/update-season.mjs` tops up the current season in both pipelines
+without touching any other: `extract.R` for that season, `data:index`,
+`garbage-time.R` for that season, `data:garbage:check`, then lint, tests and
+the production build. With `--deploy` it also syncs `dist/data/` to the bucket
+and invalidates `/data/*` (bucket and distribution come from `.env.deploy.local`,
+which is gitignored — see the deployment guide). About seven minutes end to end.
+
+Run it Tuesday morning: nflverse rebuilds its play-by-play overnight after the
+last game of the week, so a run before that sees a partial week.
+
+While a season is being played, `index.json` carries
+`in_progress: { season, through_week }`, and it is cleared once a Super Bowl
+play is in the data. The team banner and the About dialog say "in progress,
+through week N" from it. The season is the default view as soon as it has a
+game in it, but two things hold it back until it is complete: the league trends
+leave it off, because a week or two of games is not a tendency and as the last
+point it would set the headline; and the quiz does not draw from it, because
+the quiz pool is a seeded shuffle of the whole candidate list and adding a
+week's plays would deal a different quiz every week. The garbage-time files
+carry their own `through_week` and `complete`.
 
 ### Why the summary metrics are precomputed
 
@@ -75,14 +108,19 @@ reads full regular-season play-by-play and rebuilds every fantasy counting stat
 from it, bucketed by the win probability the offense faced *before* the snap.
 
 ```bash
-Rscript scripts/garbage-time.R            # SEASONS at the top of the file
+Rscript scripts/garbage-time.R            # the current season
 Rscript scripts/garbage-time.R 2016:2025  # or a range on the command line
 npm run data:garbage:check                # read it back through src/lib
 ```
 
 Set `GT_CACHE=<dir>` to cache each season's play-by-play as `.rds`, which makes
 a multi-season backfill resumable — without it every season re-downloads, at
-about three minutes each.
+about three minutes each. The current season is never cached, because its
+play-by-play changes every week.
+
+Each run touches only the seasons it was given; `seasons.json` is rebuilt from
+whatever files are in the directory. If a season fails reconciliation the script
+exits non-zero and the file that season had before, if any, stays in place.
 
 It writes one file per season to `public/data/garbage/` (~230 KB each) plus
 `seasons.json`. The browser fetches one season at a time, so the payload does
@@ -737,3 +775,4 @@ colour filled it.
 | `npm run data:index` | rebuild `index.json` from real data |
 | `npm run data:fixture` | regenerate fixture data and rebuild `index.json` |
 | `npm run data:garbage:check` | validate `public/data/garbage/` through `src/lib` |
+| `npm run data:update` | top up the current season in both pipelines; `-- --deploy` pushes the data |

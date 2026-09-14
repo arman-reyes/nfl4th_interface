@@ -169,6 +169,11 @@ export default function App() {
         season={filter?.season ?? index.data.seasons[0]}
         seasons={seasons}
         plays={seasonCount}
+        throughWeek={
+          index.data.in_progress && index.data.in_progress.season === filter?.season
+            ? index.data.in_progress.through_week
+            : null
+        }
         onChangeSeason={changeSeason}
         onChangeTeam={() => setAbbr(null)}
         onAbout={openAbout}

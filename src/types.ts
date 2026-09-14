@@ -124,7 +124,19 @@ export interface LeagueIndex {
   seasons: number[]
   /** True when the underlying play files are generated fixtures, not R output. */
   fixture: boolean
+  /**
+   * The newest season while it is still being played: absent or null once
+   * its Super Bowl is in the data. Optional because a reader can hold an
+   * index built before the field existed for up to an hour after a deploy.
+   */
+  in_progress?: SeasonProgress | null
   teams: TeamIndexEntry[]
+}
+
+export interface SeasonProgress {
+  season: number
+  /** The latest week with a play in the data; midweek that week is partial. */
+  through_week: number
 }
 
 /** The three things a staff can do on 4th down. */

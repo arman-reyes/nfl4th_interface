@@ -12,7 +12,8 @@
     "data:index": "tsx scripts/build-index.ts",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "data:garbage:check": "tsx scripts/check-garbage.ts"
+    "data:garbage:check": "tsx scripts/check-garbage.ts",
+    "data:update": "node scripts/update-season.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

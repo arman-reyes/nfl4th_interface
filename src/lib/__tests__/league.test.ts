@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   chartExtent,
   LEAGUE_METRICS,
+  leagueSeasons,
   movement,
   recordLabel,
   seasonSpreads,
   spreadExtent,
   teamSeries,
 } from '../league'
-import type { LeagueIndex, TeamSummary } from '../../types'
+import type { LeagueIndex, SeasonProgress, TeamSummary } from '../../types'
 
 function summary(over: Partial<TeamSummary> = {}): TeamSummary {
   return {
@@ -41,8 +42,12 @@ function team(abbr: string, summaries: TeamSummary[]) {
   }
 }
 
-function index(teams: ReturnType<typeof team>[], seasons = [2024, 2023]): LeagueIndex {
-  return { generated_at: '2026-01-01T00:00:00Z', seasons, fixture: false, teams }
+function index(
+  teams: ReturnType<typeof team>[],
+  seasons = [2024, 2023],
+  in_progress: SeasonProgress | null = null,
+): LeagueIndex {
+  return { generated_at: '2026-01-01T00:00:00Z', seasons, fixture: false, in_progress, teams }
 }
 
 describe('recordLabel', () => {
@@ -83,6 +88,24 @@ describe('seasonSpreads', () => {
   it('derives how often the model said go from the summary counts', () => {
     const one = index([team('A', [summary({ season: 2024, go_recommended: 44, decisions: 110 })])], [2024])
     expect(seasonSpreads(one, SAID_GO)[0].p50).toBeCloseTo(0.4, 10)
+  })
+
+  it('leaves a season still being played off the trend', () => {
+    const partial = index(
+      [
+        team('A', [summary({ season: 2024, aggressiveness: 0.4 }), summary({ season: 2025, aggressiveness: 0.9 })]),
+        team('B', [summary({ season: 2024, aggressiveness: 0.5 }), summary({ season: 2025, aggressiveness: 0.9 })]),
+      ],
+      [2025, 2024],
+      { season: 2025, through_week: 2 },
+    )
+    expect(leagueSeasons(partial)).toEqual([2024])
+    expect(seasonSpreads(partial, AGGRESSIVENESS).map((s) => s.season)).toEqual([2024])
+  })
+
+  it('keeps every season once the index says none is in progress', () => {
+    const done = index([team('A', [summary({ season: 2023 }), summary({ season: 2024 })])])
+    expect(leagueSeasons(done)).toEqual([2023, 2024])
   })
 })
 

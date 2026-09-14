@@ -118,13 +118,14 @@ export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Prop
           <>
             {score.aggressiveness > benchmarks.aggressiveness ? (
               <>
-                You have gone for it more often than the median NFL staff has over the last twelve
-                seasons.{' '}
+                You have gone for it more often than the median NFL staff has since{' '}
+                {index.seasons.at(-1)}.{' '}
               </>
             ) : (
               <>
-                You have gone for it less often than the median NFL staff has over the last twelve
-                seasons — the usual result, and the reason the league has spent a decade moving.{' '}
+                You have gone for it less often than the median NFL staff has since{' '}
+                {index.seasons.at(-1)} — the usual result, and the reason the league has spent a
+                decade moving.{' '}
               </>
             )}
           </>
