@@ -1,8 +1,11 @@
 import type { Band, Choice, PlayFacts } from '../types'
+import { forfeitedBy } from './rules'
+import type { DecisionRules } from './rules'
 
 /**
- * The decision rules. Every derived number in the app comes from this file,
- * so the definitions live here once and nowhere else.
+ * The 4th-down decision rules. Every derived number on that page comes from
+ * this file, so the definitions live here once and nowhere else; the shape
+ * they are bundled into at the bottom is what the rest of the app consumes.
  */
 
 /** Options that exist for a situation, with their expected win probability. */
@@ -79,13 +82,7 @@ export function wpOf(play: PlayFacts, choice: Choice): number | null {
 export function wpForfeited(play: PlayFacts): number | null {
   const actual = actualChoice(play)
   if (actual === null) return null
-  const chosen = wpOf(play, actual)
-  if (chosen == null) return null
-  // Measured against the model's recommendation rather than a raw argmax, so
-  // that agreeing with the model always costs exactly zero.
-  const best = wpOf(play, modelChoice(play))
-  if (best == null) return null
-  return Math.max(0, (best - chosen) * 100)
+  return forfeitedBy(FOURTH_DOWN, play, actual)
 }
 
 export function agreed(play: PlayFacts): boolean | null {
@@ -124,4 +121,21 @@ export const CHOICE_PHRASE: Record<Choice, string> = {
   go: 'going for it',
   fg: 'the field goal',
   punt: 'the punt',
+}
+
+export const CHOICES: readonly Choice[] = ['go', 'fg', 'punt']
+
+/** The 4th down, as the generic machinery sees it. */
+export const FOURTH_DOWN: DecisionRules<PlayFacts, Choice> = {
+  choices: CHOICES,
+  aggressive: 'go',
+  actual: actualChoice,
+  model: modelChoice,
+  wp: wpOf,
+  boost: (play) => play.go_boost,
+  copy: {
+    go: { verb: 'GO', label: 'Go for it', did: 'Went', past: 'WENT FOR IT', phrase: 'going for it' },
+    fg: { verb: 'KICK', label: 'Field goal', did: 'Kicked', past: 'KICKED', phrase: 'the field goal' },
+    punt: { verb: 'PUNT', label: 'Punt', did: 'Punted', past: 'PUNTED', phrase: 'the punt' },
+  },
 }

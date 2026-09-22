@@ -57,7 +57,7 @@ export function GameImpact({
       </div>
       <p className="mt-3 text-[0.6875rem] leading-relaxed text-stone-400">
         Win probability is an expected value. A game near the top of either column is one where the
-        4th-down calls gave away the most — not one where the result would have been different.
+        calls gave away the most — not one where the result would have been different.
         Calls taken at a 95%+ win probability are left out, since there was little left for them to
         change.
       </p>

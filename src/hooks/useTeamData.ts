@@ -6,6 +6,7 @@ import type {
   LeagueIndex,
   Play,
   QuizPlay,
+  QuizTry,
   TeamAbbr,
 } from '../types'
 import { useAsync } from './useAsync'
@@ -30,6 +31,22 @@ export function useLeagueIndex(): AsyncState<LeagueIndex> {
 export function useQuizPool(): AsyncState<QuizPlay[]> {
   const load = useCallback(() => dataSource.loadQuizPool(), [])
   return useAsync<QuizPlay[]>('quiz', load)
+}
+
+/**
+ * The two-point index. `active` false fetches nothing, so a reader who never
+ * opens that page never pays for it; once loaded the client caches it, so
+ * leaving and coming back costs no second request.
+ */
+export function useTwoPointIndex(active: boolean): AsyncState<LeagueIndex> {
+  const load = useCallback(() => dataSource.loadTwoPointIndex(), [])
+  return useAsync<LeagueIndex>(active ? 'twopt-index' : null, load)
+}
+
+/** The two-point quiz pool. Loaded once, on that quiz only. */
+export function useTwoPointQuizPool(): AsyncState<QuizTry[]> {
+  const load = useCallback(() => dataSource.loadTwoPointQuizPool(), [])
+  return useAsync<QuizTry[]>('twopt-quiz', load)
 }
 
 /** The seasons the garbage-time pipeline published. Loaded on that page only. */

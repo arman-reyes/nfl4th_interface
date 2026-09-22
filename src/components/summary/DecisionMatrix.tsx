@@ -1,6 +1,6 @@
-import type { Choice, PlayFacts } from '../../types'
-import { CHOICE_VERB } from '../../lib/decision'
-import { CHOICES, choiceMatrix } from '../../lib/metrics'
+import type { Situation } from '../../types'
+import { matrixWith } from '../../lib/metrics'
+import type { DecisionRules } from '../../lib/rules'
 import { pct } from '../../lib/format'
 
 /**
@@ -8,19 +8,26 @@ import { pct } from '../../lib/format'
  *
  * The diagonal is agreement. Reading a row answers the scouting question
  * directly: when the model wanted them to go, what did they do instead?
+ *
+ * One component for both kinds of decision: the rules say which choices
+ * there are and what to call them, so this is 3x3 for a 4th down and 2x2 for
+ * a try without knowing which it is drawing.
  */
-/** Column headers: what the staff did. Short enough to fit a phone. */
-const DID: Record<Choice, string> = { go: 'Went', fg: 'Kicked', punt: 'Punted' }
-
-interface Props {
-  plays: PlayFacts[]
+interface Props<P extends Situation, C extends string> {
+  rules: DecisionRules<P, C>
+  plays: P[]
   /** Defaults to the staff's own call; the quiz passes the reader's. */
-  choiceOf?: (play: PlayFacts) => Choice | null
+  choiceOf?: (play: P) => C | null
   heading?: string
 }
 
-export function DecisionMatrix({ plays, choiceOf, heading }: Props) {
-  const rows = choiceMatrix(plays, choiceOf)
+export function DecisionMatrix<P extends Situation, C extends string>({
+  rules,
+  plays,
+  choiceOf,
+  heading,
+}: Props<P, C>) {
+  const rows = matrixWith(rules, plays, choiceOf)
 
   return (
     <section>
@@ -35,9 +42,9 @@ export function DecisionMatrix({ plays, choiceOf, heading }: Props) {
               <th scope="col" className="py-1.5 pr-3 font-semibold">
                 Model said
               </th>
-              {CHOICES.map((choice) => (
+              {rules.choices.map((choice) => (
                 <th key={choice} scope="col" className="py-1.5 pr-2 text-right font-semibold">
-                  {DID[choice]}
+                  {rules.copy[choice].did}
                 </th>
               ))}
             </tr>
@@ -47,13 +54,13 @@ export function DecisionMatrix({ plays, choiceOf, heading }: Props) {
               <tr key={row.model} className="border-t border-stone-200">
                 <th scope="row" className="w-24 py-2 pr-3 text-left">
                   <span className="block text-sm font-bold tracking-wide text-stone-900 uppercase">
-                    {CHOICE_VERB[row.model]}
+                    {rules.copy[row.model].verb}
                   </span>
                   <span className="tnum block text-[0.625rem] font-normal text-stone-400">
                     {row.total} {row.total === 1 ? 'time' : 'times'}
                   </span>
                 </th>
-                {CHOICES.map((choice) => (
+                {rules.choices.map((choice) => (
                   <Cell
                     key={choice}
                     count={row.counts[choice]}

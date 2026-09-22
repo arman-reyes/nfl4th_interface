@@ -8,34 +8,28 @@
 export type TeamAbbr = string
 
 /**
- * One 4th-down play, exactly as emitted by `nfl4th::add_4th_probs()`.
+ * What every reviewed decision carries, whichever kind it is: when it
+ * happened, who had the ball, the score, and how the game ended.
  *
- * Win-probability fields (`*_wp`) are probabilities on a 0-1 scale.
- * `go_boost` is the only field already expressed in percentage points.
- *
- * `fg_*` and `punt_*` are null where the option does not exist for the
- * situation (a field goal from midfield, a punt from the 3), so every
- * consumer must treat them as optional rather than assume three options.
+ * A 4th down and a try are different decisions with different options, but
+ * the drill-down, the game roll-ups and the per-game filters only ever look at
+ * these fields, so they are written once against this and work for both.
  */
-export interface Play {
+export interface Situation {
   game_id: string
   /** Unique within a game; game_id + play_id is the stable key for a play. */
   play_id: number
-  desc: string
   season: number
   week: number
   qtr: number
   quarter_seconds_remaining: number
   posteam: TeamAbbr
   defteam: TeamAbbr
-  ydstogo: number
-  /** Distance to the opponent's end zone: 1 = goal line, 99 = own 1. */
-  yardline_100: number
   /** From the offense's perspective. */
   score_differential: number
   posteam_timeouts_remaining: number
   defteam_timeouts_remaining: number
-  /** What the staff actually did. Mapped to a Choice by `actualChoice()`. */
+  /** What the staff actually did. Mapped to a choice by the decision rules. */
   play_type: string | null
 
   /** True when the offense was the home team in this game. */
@@ -47,6 +41,23 @@ export interface Play {
    */
   posteam_final_score: number | null
   defteam_final_score: number | null
+}
+
+/**
+ * One 4th-down play, exactly as emitted by `nfl4th::add_4th_probs()`.
+ *
+ * Win-probability fields (`*_wp`) are probabilities on a 0-1 scale.
+ * `go_boost` is the only field already expressed in percentage points.
+ *
+ * `fg_*` and `punt_*` are null where the option does not exist for the
+ * situation (a field goal from midfield, a punt from the 3), so every
+ * consumer must treat them as optional rather than assume three options.
+ */
+export interface Play extends Situation {
+  desc: string
+  ydstogo: number
+  /** Distance to the opponent's end zone: 1 = goal line, 99 = own 1. */
+  yardline_100: number
 
   /** Win probability gained by going for it, in percentage points. */
   go_boost: number
@@ -157,6 +168,60 @@ export type PlayFacts = Omit<Play, 'desc'>
 
 /** A play in the quiz pool: the facts, with the outcome withheld. */
 export type QuizPlay = PlayFacts
+
+/* ---------------------------------------------------------------------------
+ * Tries: the decision after a touchdown, kick the extra point or go for two.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * One try, as priced by `nfl4th::add_2pt_probs()`, with the same framing as a
+ * 4th down: what the staff did, and what each option was worth.
+ *
+ * `score_differential` is read off the try row, which nflfastR states after
+ * the touchdown and before the try — so "up 6" means the kick makes it seven
+ * and the two makes it eight. The `wp_*` fields are the offense's win
+ * probability once the try has scored that many points and the opponent has
+ * the ball first-and-ten at its own 25.
+ *
+ * Both options always exist: there is no situation where a team may not kick
+ * or may not go, so unlike a 4th down none of these are null.
+ */
+export interface Try extends Situation {
+  desc: string
+  /**
+   * Where the try was snapped from. Normally 15 for a kick and 2 for a two-
+   * point attempt; anything else is a penalty moving it. nfl4th prices every
+   * kick from the 15 and every two-point try from the 2 regardless.
+   */
+  yardline_100: number
+
+  /**
+   * Win probability gained by going for two rather than kicking, in
+   * percentage points: `100 × (wp_go2 − wp_go1)`. Restated by the extract the
+   * way nfl4th states `go_boost` for a 4th down, so the sign is the verdict.
+   */
+  go_boost: number
+  /** Chance the extra point is good. */
+  conv_1pt: number
+  /** Chance the two-point try converts. */
+  conv_2pt: number
+  /** Win probability after the try scores nothing, one, or two. */
+  wp_0: number
+  wp_1: number
+  wp_2: number
+  /** Expected win probability of kicking: `conv_1pt × wp_1 + (1 − conv_1pt) × wp_0`. */
+  wp_go1: number
+  /** Expected win probability of going for two: `conv_2pt × wp_2 + (1 − conv_2pt) × wp_0`. */
+  wp_go2: number
+}
+
+/** The two things a staff can do after a touchdown. */
+export type TryChoice = 'kick' | 'two'
+
+/** A try without its narration, for the same reason as `PlayFacts`. */
+export type TryFacts = Omit<Try, 'desc'>
+
+export type QuizTry = TryFacts
 
 /* ---------------------------------------------------------------------------
  * Garbage time: fantasy production binned by pre-snap win probability.

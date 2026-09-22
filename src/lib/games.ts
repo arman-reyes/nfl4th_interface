@@ -1,8 +1,9 @@
-import type { Play } from '../types'
-import { actualChoice } from './decision'
-import { decisionImpact } from './impact'
+import type { Play, Situation } from '../types'
+import { FOURTH_DOWN } from './decision'
+import { judgeDecision } from './impact'
 import { gameResult } from './filters'
 import type { GameResult } from './filters'
+import type { DecisionRules } from './rules'
 
 /**
  * Per-game roll-ups of the 4th-down decisions.
@@ -34,7 +35,10 @@ export interface GameSummary {
   forfeitedLive: number
 }
 
-export function summarizeGames(plays: Play[]): GameSummary[] {
+export function summarizeGamesWith<P extends Situation, C extends string>(
+  rules: DecisionRules<P, C>,
+  plays: P[],
+): GameSummary[] {
   const byGame = new Map<string, GameSummary>()
 
   for (const play of plays) {
@@ -55,10 +59,10 @@ export function summarizeGames(plays: Play[]): GameSummary[] {
       byGame.set(play.game_id, game)
     }
 
-    if (actualChoice(play) === null) continue
+    if (rules.actual(play) === null) continue
     game.decisions += 1
 
-    const impact = decisionImpact(play)
+    const impact = judgeDecision(rules, play)
     if (impact === null) continue
     game.disagreements += 1
     game.forfeited += impact.cost
@@ -66,6 +70,10 @@ export function summarizeGames(plays: Play[]): GameSummary[] {
   }
 
   return [...byGame.values()].sort((a, b) => a.week - b.week)
+}
+
+export function summarizeGames(plays: Play[]): GameSummary[] {
+  return summarizeGamesWith(FOURTH_DOWN, plays)
 }
 
 /**

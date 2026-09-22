@@ -149,14 +149,83 @@ function describe(play) {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Tries: the same stand-in idea for the two-point page. Each touchdown gets
+ * a try priced from the margin and the clock, with the extra point a 94% kick
+ * and the two-point try a coin flip, so the page has the right shape of data
+ * — mostly hairline calls, a few clear ones late — before the R output exists.
+ * ------------------------------------------------------------------------- */
+
+/** Win probability after the try, with the opponent taking the kickoff. */
+const wpAfterTry = (margin, secondsLeft) => wpAfterTurnover(margin, 75, secondsLeft)
+
+function buildTry(rand, posteam, defteam, season, week, gameId, playId) {
+  const qtr = 1 + Math.floor(rand() * 4)
+  const quarterSeconds = Math.round(rand() * 900)
+  const secondsLeft = (4 - qtr) * 900 + quarterSeconds
+  // The margin after the touchdown: two-score games are common, ties less so.
+  const margin = Math.round((rand() - 0.5) * 30)
+  const conv_1pt = round(0.94 + (rand() - 0.5) * 0.02)
+  const conv_2pt = round(0.48 + (rand() - 0.5) * 0.1)
+  const wp_0 = round(wpAfterTry(margin, secondsLeft))
+  const wp_1 = round(wpAfterTry(margin + 1, secondsLeft))
+  const wp_2 = round(wpAfterTry(margin + 2, secondsLeft))
+  const wp_go1 = round(conv_1pt * wp_1 + (1 - conv_1pt) * wp_0)
+  const wp_go2 = round(conv_2pt * wp_2 + (1 - conv_2pt) * wp_0)
+  return {
+    game_id: gameId,
+    play_id: playId,
+    desc: '',
+    season,
+    week,
+    qtr,
+    quarter_seconds_remaining: quarterSeconds,
+    posteam,
+    defteam,
+    yardline_100: 15,
+    score_differential: margin,
+    posteam_timeouts_remaining: 3 - Math.floor(rand() * 3.4),
+    defteam_timeouts_remaining: 3 - Math.floor(rand() * 3.4),
+    play_type: null,
+    go_boost: round(100 * (wp_go2 - wp_go1), 3),
+    conv_1pt,
+    conv_2pt,
+    wp_0,
+    wp_1,
+    wp_2,
+    wp_go1,
+    wp_go2,
+  }
+}
+
+/** A staff's choice on a try: the kick unless the edge for two is real. */
+function decideTry(play, rand, alpha) {
+  const pTwo = logistic(alpha + 0.6 * play.go_boost - 2.6)
+  if (rand() < pTwo) {
+    play.yardline_100 = 2
+    return rand() < 0.7 ? 'pass' : 'run'
+  }
+  return 'extra_point'
+}
+
+function describeTry(play) {
+  const m = Math.floor(play.quarter_seconds_remaining / 60)
+  return play.play_type === 'extra_point'
+    ? `(${m}:00) Extra point is GOOD.`
+    : `(${m}:00) TWO-POINT CONVERSION ATTEMPT. ${play.play_type === 'pass' ? 'Pass' : 'Rush'} from ${play.defteam} 2.`
+}
+
 rmSync(`${OUT}/teams`, { recursive: true, force: true })
 mkdirSync(`${OUT}/teams`, { recursive: true })
+rmSync(`${OUT}/twopt/teams`, { recursive: true, force: true })
+mkdirSync(`${OUT}/twopt/teams`, { recursive: true })
 
 TEAMS.forEach((team, index) => {
   const rand = rng(2654435761 + index * 7919)
   // Latent staff aggressiveness, spread across the league.
   const alpha = -1.7 + 2.3 * ((index * 13) % 32) / 31
   const plays = []
+  const tries = []
 
   for (const season of SEASONS) {
     for (let game = 0; game < GAMES_PER_SEASON; game += 1) {
@@ -175,14 +244,27 @@ TEAMS.forEach((team, index) => {
         play.desc = describe(play)
         plays.push(play)
       }
+      // A touchdown or three a game, each followed by a try.
+      const touchdowns = 1 + Math.floor(rand() * 3.5)
+      for (let i = 0; i < touchdowns; i += 1) {
+        const t = buildTry(rand, team.team_abbr, opponent, season, week, gameId, 100 + i)
+        t.play_type = decideTry(t, rand, alpha)
+        t.desc = describeTry(t)
+        tries.push(t)
+      }
     }
   }
 
   plays.sort((a, b) => a.season - b.season || a.week - b.week || b.qtr - a.qtr)
   writeFileSync(`${OUT}/teams/${team.team_abbr}.json`, JSON.stringify(plays))
-  process.stdout.write(`${team.team_abbr} ${String(plays.length).padStart(4)} plays\n`)
+  tries.sort((a, b) => a.season - b.season || a.week - b.week || b.qtr - a.qtr)
+  writeFileSync(`${OUT}/twopt/teams/${team.team_abbr}.json`, JSON.stringify(tries))
+  process.stdout.write(
+    `${team.team_abbr} ${String(plays.length).padStart(4)} plays  ${String(tries.length).padStart(4)} tries\n`,
+  )
 })
 
 writeFileSync(`${OUT}/index.json`, JSON.stringify(TEAMS, null, 2))
-process.stdout.write('\nWrote fixture team files and the raw public/data/index.json\n')
-process.stdout.write('Next: npm run build:index\n')
+writeFileSync(`${OUT}/twopt/index.json`, JSON.stringify(TEAMS, null, 2))
+process.stdout.write('\nWrote fixture team files and the raw index.json for both pipelines\n')
+process.stdout.write('Next: npm run data:index && npm run data:index:twopt\n')

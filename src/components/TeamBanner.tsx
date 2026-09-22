@@ -8,6 +8,8 @@ interface Props {
   season: number
   seasons: number[]
   plays: number
+  /** What `plays` counts, plural: "fourth downs", "tries". */
+  noun?: string
   /** The latest week in the data when the shown season is still being played. */
   throughWeek?: number | null
   onChangeSeason: (season: number) => void
@@ -29,6 +31,7 @@ export function TeamBanner({
   season,
   seasons,
   plays,
+  noun = 'fourth downs',
   throughWeek = null,
   onChangeSeason,
   onChangeTeam,
@@ -76,7 +79,7 @@ export function TeamBanner({
           </svg>
         </div>
         <span className="min-w-0 flex-1 truncate text-sm font-medium opacity-70 sm:text-base">
-          {plays} fourth downs
+          {plays} {noun}
           {throughWeek !== null && (
             <span className="opacity-80"> · in progress, through {weekLongLabel(season, throughWeek)}</span>
           )}

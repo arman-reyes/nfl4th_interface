@@ -1,35 +1,40 @@
-import type { Band, Choice, Play, TeamMeta } from '../../types'
-import { CHOICE_VERB } from '../../lib/decision'
+import type { Situation, TeamMeta } from '../../types'
+import { band } from '../../lib/decision'
 import { pct, points } from '../../lib/format'
 import { accentOnLight } from '../../lib/color'
-import { decisionImpact, GAME_STATE_NOTE } from '../../lib/impact'
+import { GAME_STATE_NOTE, judgeDecision } from '../../lib/impact'
 import type { DecisionImpact } from '../../lib/impact'
+import type { DecisionRules } from '../../lib/rules'
 import { BandMeter } from './BandMeter'
 
-interface Props {
-  play: Play
+interface Props<P extends Situation, C extends string> {
+  rules: DecisionRules<P, C>
+  play: P
   team?: TeamMeta
-  actual: Choice | null
-  recommended: Choice
-  band: Band
-}
-
-const PAST_TENSE: Record<Choice, string> = {
-  go: 'WENT FOR IT',
-  fg: 'KICKED',
-  punt: 'PUNTED',
+  /** What the play is called when it carries no decision: "this 4th down". */
+  noun: string
 }
 
 /**
  * The comparison, side by side: what happened, then what the model wanted.
  * What happened comes first because that is the thing being reviewed; the
  * model is the yardstick held up against it.
+ *
+ * Everything shown is read through the rules, so the same two panels review
+ * a 4th down and a try.
  */
-export function OutcomePanels({ play, team, actual, recommended, band }: Props) {
+export function OutcomePanels<P extends Situation, C extends string>({
+  rules,
+  play,
+  team,
+  noun,
+}: Props<P, C>) {
   const accent = team ? accentOnLight(team.team_abbr) : '#1c1917'
+  const actual = rules.actual(play)
+  const recommended = rules.model(play)
   const matched = actual !== null && actual === recommended
-  const actualWp = actual === null ? null : actual === 'go' ? play.go_wp : actual === 'fg' ? play.fg_wp : play.punt_wp
-  const modelWp = recommended === 'go' ? play.go_wp : recommended === 'fg' ? play.fg_wp : play.punt_wp
+  const actualWp = actual === null ? null : rules.wp(play, actual)
+  const modelWp = rules.wp(play, recommended)
 
   return (
     <div className="space-y-3">
@@ -38,7 +43,7 @@ export function OutcomePanels({ play, team, actual, recommended, band }: Props) 
           heading="On the field"
           headingColor={accent}
           rule={accent}
-          verdict={actual === null ? 'NO CALL' : PAST_TENSE[actual]}
+          verdict={actual === null ? 'NO CALL' : rules.copy[actual].past}
           wp={actualWp}
           note={
             actual === null
@@ -52,16 +57,17 @@ export function OutcomePanels({ play, team, actual, recommended, band }: Props) 
           // A neutral rule, so the coloured one is always the team's own half
           // of the comparison — including for the teams whose colour is black.
           rule="#a8a29e"
-          verdict={CHOICE_VERB[recommended]}
+          verdict={rules.copy[recommended].verb}
           wp={modelWp}
-          note={<BandMeter band={band} />}
+          note={<BandMeter band={band(rules.boost(play))} />}
         />
       </div>
 
       <VerdictStrip
         matched={matched}
-        actual={actual}
-        impact={decisionImpact(play)}
+        noCall={actual === null}
+        noun={noun}
+        impact={judgeDecision(rules, play)}
         modelWp={modelWp}
       />
     </div>
@@ -103,19 +109,21 @@ function Panel({ heading, headingColor, rule, verdict, wp, note }: PanelProps) {
 
 function VerdictStrip({
   matched,
-  actual,
+  noCall,
+  noun,
   impact,
   modelWp,
 }: {
   matched: boolean
-  actual: Choice | null
+  noCall: boolean
+  noun: string
   impact: DecisionImpact | null
   modelWp: number | null
 }) {
-  if (actual === null) {
+  if (noCall) {
     return (
       <p className="rounded-md bg-stone-100 px-4 py-3 text-sm text-stone-600">
-        No decision to review — this 4th down is excluded from agreement statistics.
+        No decision to review — {noun} is excluded from agreement statistics.
       </p>
     )
   }

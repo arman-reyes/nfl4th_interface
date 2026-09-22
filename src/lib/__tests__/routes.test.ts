@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { pathFor, SECTIONS, sectionOf, viewAt } from '../routes'
 import type { ViewName } from '../routes'
 
-const VIEWS: ViewName[] = ['teams', 'trends', 'quiz', 'garbage', 'garbageTrends']
+const VIEWS: ViewName[] = [
+  'teams',
+  'trends',
+  'quiz',
+  'twopt',
+  'twoptTrends',
+  'twoptQuiz',
+  'garbage',
+  'garbageTrends',
+]
 
 describe('routes', () => {
   it('round-trips every view', () => {
@@ -31,8 +40,8 @@ describe('routes', () => {
 })
 
 describe('sections', () => {
-  it('lists the statistical displays, 4th downs first', () => {
-    expect(SECTIONS.map((s) => s.view)).toEqual(['teams', 'garbage'])
+  it('lists the statistical displays, 4th downs first and the two nfl4th pages together', () => {
+    expect(SECTIONS.map((s) => s.view)).toEqual(['teams', 'twopt', 'garbage'])
   })
 
   it('gives every section a real route', () => {
@@ -54,7 +63,17 @@ describe('sections', () => {
   it('files each sub-view under the page whose data it reads', () => {
     expect(sectionOf('trends').view).toBe('teams')
     expect(sectionOf('quiz').view).toBe('teams')
+    expect(sectionOf('twoptTrends').view).toBe('twopt')
+    expect(sectionOf('twoptQuiz').view).toBe('twopt')
     expect(sectionOf('garbageTrends').view).toBe('garbage')
+  })
+
+  it('nests the two-point trends and quiz under their own page', () => {
+    expect(pathFor('twopt')).toBe('/twopoint')
+    expect(viewAt('/twopoint/trends')).toBe('twoptTrends')
+    expect(viewAt('/twopoint/quiz')).toBe('twoptQuiz')
+    expect(viewAt('/TwoPoint')).toBe('twopt')
+    expect(sectionOf('twopt').title).toBe('2-Point Stats')
   })
 
   it('nests garbage-time trends under its own page', () => {

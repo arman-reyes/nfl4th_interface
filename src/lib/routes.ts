@@ -1,18 +1,29 @@
 /**
- * The four places this site has, and the URLs they live at.
+ * The places this site has, and the URLs they live at.
  *
  * Pure and DOM-free so it can be tested without a browser, and so `useRoute`
  * stays small enough to read in one go. There is exactly one level of routing
  * and no parameters, which is why there is no router library here.
  */
 
-export type ViewName = 'teams' | 'trends' | 'quiz' | 'garbage' | 'garbageTrends'
+export type ViewName =
+  | 'teams'
+  | 'trends'
+  | 'quiz'
+  | 'twopt'
+  | 'twoptTrends'
+  | 'twoptQuiz'
+  | 'garbage'
+  | 'garbageTrends'
 
 /** '/' must be the teams entry: it is where an unrecognised path lands. */
 const PATHS: Record<ViewName, string> = {
   teams: '/',
   trends: '/trends',
   quiz: '/quiz',
+  twopt: '/twopoint',
+  twoptTrends: '/twopoint/trends',
+  twoptQuiz: '/twopoint/quiz',
   garbage: '/garbagetime',
   garbageTrends: '/garbagetime/trends',
 }
@@ -70,6 +81,11 @@ export const SECTIONS: Section[] = [
     blurb: 'Every 4th down a team faced, and what the model would have done instead.',
   },
   {
+    view: 'twopt',
+    title: '2-Point Stats',
+    blurb: 'Every extra point and two-point try a team faced, and what the model would have done instead.',
+  },
+  {
     view: 'garbage',
     title: 'Garbage Time',
     blurb: 'Fantasy rankings with the plays that happened after the game was decided taken out.',
@@ -80,12 +96,15 @@ export const SECTIONS: Section[] = [
  * Which section's heading a view sits under.
  *
  * Sub-views belong to the page whose data they read: league trends and the quiz
- * are 4th-down views, and garbage time has trends of its own. Anything
- * unrecognised falls back to the landing section.
+ * are 4th-down views, the two-point page has both of its own, and garbage time
+ * has trends of its own. Anything unrecognised falls back to the landing
+ * section.
  */
 const PARENT: Partial<Record<ViewName, ViewName>> = {
   trends: 'teams',
   quiz: 'teams',
+  twoptTrends: 'twopt',
+  twoptQuiz: 'twopt',
   garbageTrends: 'garbage',
 }
 

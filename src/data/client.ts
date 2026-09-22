@@ -4,7 +4,9 @@ import type {
   LeagueIndex,
   Play,
   QuizPlay,
+  QuizTry,
   TeamAbbr,
+  Try,
 } from '../types'
 
 /**
@@ -22,6 +24,15 @@ export interface DataSource {
   loadTeamPlays(abbr: TeamAbbr): Promise<Play[]>
   /** A sample of 4th downs for the quiz, without their descriptions. */
   loadQuizPool(): Promise<QuizPlay[]>
+  /**
+   * The two-point pipeline's index: the same shape as the 4th-down one, with
+   * the summaries counting tries. Loaded once, on that page only.
+   */
+  loadTwoPointIndex(): Promise<LeagueIndex>
+  /** One team's tries. Fetched on selection, then cached. */
+  loadTwoPointTeam(abbr: TeamAbbr): Promise<Try[]>
+  /** A sample of tries for the two-point quiz. */
+  loadTwoPointQuizPool(): Promise<QuizTry[]>
   /** Seasons the garbage-time pipeline has published. Loaded once. */
   loadGarbageSeasons(): Promise<GarbageSeasons>
   /** One season of fantasy production binned by win probability. */
@@ -65,6 +76,18 @@ const fetchTeam = memoize<TeamAbbr, Play[]>((abbr) =>
 
 const fetchQuiz = memoize<'quiz', QuizPlay[]>(() => getJson<QuizPlay[]>(`${BASE}/quiz.json`))
 
+const fetchTwoPointIndex = memoize<'index', LeagueIndex>(() =>
+  getJson<LeagueIndex>(`${BASE}/twopt/index.json`),
+)
+
+const fetchTwoPointTeam = memoize<TeamAbbr, Try[]>((abbr) =>
+  getJson<Try[]>(`${BASE}/twopt/teams/${abbr}.json`),
+)
+
+const fetchTwoPointQuiz = memoize<'quiz', QuizTry[]>(() =>
+  getJson<QuizTry[]>(`${BASE}/twopt/quiz.json`),
+)
+
 const fetchGarbageSeasons = memoize<'seasons', GarbageSeasons>(() =>
   getJson<GarbageSeasons>(`${BASE}/garbage/seasons.json`),
 )
@@ -77,6 +100,9 @@ export const staticDataSource: DataSource = {
   loadIndex: () => fetchIndex('index'),
   loadTeamPlays: (abbr) => fetchTeam(abbr),
   loadQuizPool: () => fetchQuiz('quiz'),
+  loadTwoPointIndex: () => fetchTwoPointIndex('index'),
+  loadTwoPointTeam: (abbr) => fetchTwoPointTeam(abbr),
+  loadTwoPointQuizPool: () => fetchTwoPointQuiz('quiz'),
   loadGarbageSeasons: () => fetchGarbageSeasons('seasons'),
   loadGarbageTime: (season) => fetchGarbage(season),
 }

@@ -1,16 +1,20 @@
 import { useMemo } from 'react'
-import type { Choice, LeagueIndex, PlayFacts } from '../../types'
+import type { LeagueIndex, Situation } from '../../types'
 import { pct, points } from '../../lib/format'
 import type { Answer } from '../../lib/quiz'
-import { scoreRound } from '../../lib/quiz'
+import { scoreRoundWith } from '../../lib/quiz'
+import type { DecisionRules } from '../../lib/rules'
 import { StatTile } from '../summary/StatTile'
 import { DecisionMatrix } from '../summary/DecisionMatrix'
+import type { QuizCopy } from './copy'
 
-interface Props {
+interface Props<P extends Situation, C extends string> {
+  rules: DecisionRules<P, C>
+  copy: QuizCopy
   /** Every call this session, across all rounds. */
-  all: Answer[]
+  all: Answer<P, C>[]
   /** Just the round that finished. */
-  round: Answer[]
+  round: Answer<P, C>[]
   rounds: number
   index: LeagueIndex
   onAgain: () => void
@@ -33,9 +37,18 @@ function leagueMedian(index: LeagueIndex, pick: (abbr: string) => number | null)
  * Cumulative on purpose: ten calls is far too few to say anything about anyone,
  * and the honest way to make the numbers mean more is to answer more of them.
  */
-export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Props) {
-  const score = useMemo(() => scoreRound(all), [all])
-  const lastRound = useMemo(() => scoreRound(round), [round])
+export function QuizResults<P extends Situation, C extends string>({
+  rules,
+  copy,
+  all,
+  round,
+  rounds,
+  index,
+  onAgain,
+  onBack,
+}: Props<P, C>) {
+  const score = useMemo(() => scoreRoundWith(rules, all), [rules, all])
+  const lastRound = useMemo(() => scoreRoundWith(rules, round), [rules, round])
 
   const benchmarks = useMemo(() => {
     const allSeasons = (abbr: string) =>
@@ -48,10 +61,12 @@ export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Prop
 
   // The matrix renders from the plays plus a lookup of what the reader called.
   const calls = useMemo(() => {
-    const map = new Map<PlayFacts, Choice | null>()
+    const map = new Map<P, C | null>()
     for (const answer of all) map.set(answer.play, answer.choice)
     return map
   }, [all])
+
+  const smallSample = score.decisions < copy.smallSample
 
   return (
     <div className="space-y-6">
@@ -80,7 +95,7 @@ export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Prop
         <StatTile
           label="Aggressiveness"
           value={score.aggressiveness === null ? '—' : pct(score.aggressiveness)}
-          note={`went on ${score.goTaken} of ${score.goRecommended} the model wanted`}
+          note={`${copy.verb} on ${score.goTaken} of ${score.goRecommended} the model wanted`}
           benchmark={
             benchmarks.aggressiveness === null
               ? undefined
@@ -108,6 +123,7 @@ export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Prop
       </dl>
 
       <DecisionMatrix
+        rules={rules}
         plays={all.map((a) => a.play)}
         choiceOf={(play) => calls.get(play) ?? null}
         heading="Your calls against the model"
@@ -118,27 +134,26 @@ export function QuizResults({ all, round, rounds, index, onAgain, onBack }: Prop
           <>
             {score.aggressiveness > benchmarks.aggressiveness ? (
               <>
-                You have gone for it more often than the median NFL staff has since{' '}
+                You have {copy.verbPerfect} more often than the median NFL staff has since{' '}
                 {index.seasons.at(-1)}.{' '}
               </>
             ) : (
               <>
-                You have gone for it less often than the median NFL staff has since{' '}
-                {index.seasons.at(-1)} — the usual result, and the reason the league has spent a
-                decade moving.{' '}
+                You have {copy.verbPerfect} less often than the median NFL staff has since{' '}
+                {index.seasons.at(-1)} — {copy.lessOftenNote}.{' '}
               </>
             )}
           </>
         )}
-        {score.decisions < 30 ? (
+        {smallSample ? (
           <>
             {score.decisions} calls is still a small sample. Another round or two makes these
-            numbers worth something — a full NFL season is about 130.
+            numbers worth something — a full NFL season is about {copy.seasonSize}.
           </>
         ) : (
           <>
-            {score.decisions} calls is getting close to a real sample; an NFL team faces about 130
-            in a season.
+            {score.decisions} calls is getting close to a real sample; an NFL team faces about{' '}
+            {copy.seasonSize} in a season.
           </>
         )}
       </p>

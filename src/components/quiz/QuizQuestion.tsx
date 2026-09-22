@@ -1,26 +1,32 @@
 import { useEffect, useState } from 'react'
-import type { Choice, QuizPlay } from '../../types'
-import { CHOICE_VERB, wpOf } from '../../lib/decision'
+import type { Situation } from '../../types'
 import { SECONDS_PER_QUESTION } from '../../lib/quiz'
-import { QuizSituation } from './QuizSituation'
+import type { DecisionRules } from '../../lib/rules'
 
-interface Props {
-  play: QuizPlay
+interface Props<P extends Situation, C extends string> {
+  rules: DecisionRules<P, C>
+  play: P
   number: number
   total: number
-  onAnswer: (choice: Choice | null) => void
+  /** The situation as the model sees it, drawn by the page that owns it. */
+  situation: React.ReactNode
+  onAnswer: (choice: C | null) => void
 }
 
-const OPTIONS: Choice[] = ['go', 'fg', 'punt']
-
 /**
- * One 4th down, put to the reader with a clock running.
+ * One decision, put to the reader with a clock running.
  *
- * The situation shows exactly what the model is given — down, distance, field
- * position, clock, score, timeouts — and nothing else. No team names beyond
- * who has the ball, and no hint of what happened next.
+ * The situation shows exactly what the model is given and nothing else. No
+ * team names beyond who has the ball, and no hint of what happened next.
  */
-export function QuizQuestion({ play, number, total, onAnswer }: Props) {
+export function QuizQuestion<P extends Situation, C extends string>({
+  rules,
+  play,
+  number,
+  total,
+  situation,
+  onAnswer,
+}: Props<P, C>) {
   const [remaining, setRemaining] = useState(SECONDS_PER_QUESTION * 1000)
 
   // The parent keys this component per question, so it remounts with a fresh
@@ -64,14 +70,16 @@ export function QuizQuestion({ play, number, total, onAnswer }: Props) {
         </div>
       </div>
 
-      <QuizSituation play={play} />
+      {situation}
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        {OPTIONS.map((choice) => {
+      <div
+        className={`grid gap-2 ${rules.choices.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}
+      >
+        {rules.choices.map((choice) => {
           // nfl4th prices no punt from inside the opponent's 30, and no kick
           // from beyond range. An option it cannot price cannot be scored, so
           // it is offered as unavailable rather than as a trap.
-          const available = wpOf(play, choice) !== null
+          const available = rules.wp(play, choice) !== null
           return (
             <button
               key={choice}
@@ -83,7 +91,7 @@ export function QuizQuestion({ play, number, total, onAnswer }: Props) {
                   : 'cursor-not-allowed border-dashed border-stone-200 bg-transparent text-stone-300'
               }`}
             >
-              {CHOICE_VERB[choice]}
+              {rules.copy[choice].verb}
               {!available && (
                 <span className="mt-0.5 block text-[0.625rem] font-semibold tracking-wide uppercase">
                   not available

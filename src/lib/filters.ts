@@ -1,4 +1,4 @@
-import type { Play, PlayFacts } from '../types'
+import type { Situation } from '../types'
 
 /**
  * The drill-down: team, then season, then week, then quarter, then the
@@ -16,7 +16,7 @@ export interface PlayFilter {
 }
 
 /** Stable identity for a play. game_id alone repeats across a team's history. */
-export function playKey(play: PlayFacts): string {
+export function playKey(play: Situation): string {
   return `${play.game_id}:${play.play_id}`
 }
 
@@ -67,22 +67,22 @@ function sortedUnique(values: number[]): number[] {
   return [...new Set(values)].sort((a, b) => a - b)
 }
 
-export function seasonsOf(plays: Play[]): number[] {
+export function seasonsOf(plays: Situation[]): number[] {
   return sortedUnique(plays.map((p) => p.season)).reverse()
 }
 
-export function weeksOf(plays: Play[], season: number): number[] {
+export function weeksOf(plays: Situation[], season: number): number[] {
   return sortedUnique(plays.filter((p) => p.season === season).map((p) => p.week))
 }
 
-export function quartersOf(plays: Play[], season: number, week: number | All): number[] {
+export function quartersOf(plays: Situation[], season: number, week: number | All): number[] {
   return sortedUnique(
     plays.filter((p) => p.season === season && (week === ALL || p.week === week)).map((p) => p.qtr),
   )
 }
 
 /** Plays matching the filter, in the order they were played. */
-export function applyFilter(plays: Play[], filter: PlayFilter): Play[] {
+export function applyFilter<P extends Situation>(plays: P[], filter: PlayFilter): P[] {
   return plays
     .filter(
       (p) =>
@@ -102,7 +102,7 @@ export function applyFilter(plays: Play[], filter: PlayFilter): Play[] {
  * "all". Called whenever the team changes, so switching teams never strands
  * the user on a week the new team did not play.
  */
-export function reconcile(plays: Play[], filter: PlayFilter | null): PlayFilter {
+export function reconcile(plays: Situation[], filter: PlayFilter | null): PlayFilter {
   const seasons = seasonsOf(plays)
   const season = filter && seasons.includes(filter.season) ? filter.season : (seasons[0] ?? 0)
   const weeks = weeksOf(plays, season)
@@ -112,7 +112,7 @@ export function reconcile(plays: Play[], filter: PlayFilter | null): PlayFilter 
   return { season, week, qtr }
 }
 
-export interface GameGroup {
+export interface GameGroup<P extends Situation = Situation> {
   gameId: string
   season: number
   week: number
@@ -120,7 +120,7 @@ export interface GameGroup {
   /** True when the team being viewed played this one at home. */
   home: boolean
   result: GameResult | null
-  plays: Play[]
+  plays: P[]
 }
 
 export interface GameResult {
@@ -135,7 +135,7 @@ export interface GameResult {
  * that team as `posteam`, so the offense's columns are already the right way
  * round.
  */
-export function gameResult(play: Play): GameResult | null {
+export function gameResult(play: Situation): GameResult | null {
   const scoreFor = play.posteam_final_score
   const scoreAgainst = play.defteam_final_score
   if (scoreFor == null || scoreAgainst == null) return null
@@ -151,8 +151,8 @@ export function gameResult(play: Play): GameResult | null {
  * it once per game and gives a long list something to navigate by.
  * Input order is preserved, so the groups come out in the order played.
  */
-export function groupByGame(plays: Play[]): GameGroup[] {
-  const groups: GameGroup[] = []
+export function groupByGame<P extends Situation>(plays: P[]): GameGroup<P>[] {
+  const groups: GameGroup<P>[] = []
   for (const play of plays) {
     const last = groups.at(-1)
     if (last && last.gameId === play.game_id) {

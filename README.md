@@ -2,7 +2,9 @@
 
 A coach-facing interface over the [`nfl4th`](https://www.nfl4th.com/) win-probability
 model. It answers two questions for any of the 32 NFL teams: what does the model say
-they should do on 4th down, and what do they actually do?
+they should do on 4th down, and what do they actually do? A second page asks the
+same two questions of the decision after every touchdown — kick the extra point, or
+go for two — through the same interface.
 
 The model is not part of this app. `nfl4th` produces the point estimates; this
 repository is the interface that makes them legible.
@@ -51,16 +53,16 @@ when that team is selected.
 ### Keeping up with the season
 
 ```bash
-npm run data:update                     # current season, both pipelines
+npm run data:update                     # current season, all three pipelines
 npm run data:update -- --season 2026    # a specific season
 npm run data:update -- --deploy         # ...and push the data to S3
-npm run data:update -- --only garbage   # one pipeline: fourth | garbage
+npm run data:update -- --only garbage   # one pipeline: fourth | twopt | garbage
 ```
 
-`scripts/update-season.mjs` tops up the current season in both pipelines
+`scripts/update-season.mjs` tops up the current season in every pipeline
 without touching any other: `extract.R` for that season, `data:index`,
-`garbage-time.R` for that season, `data:garbage:check`, then lint, tests and
-the production build. With `--deploy` it also syncs `dist/data/` to the bucket
+`extract-2pt.R` and `data:index:twopt`, `garbage-time.R` for that season,
+`data:garbage:check`, then lint, tests and the production build. With `--deploy` it also syncs `dist/data/` to the bucket
 and invalidates `/data/*` (bucket and distribution come from `.env.deploy.local`,
 which is gitignored — see the deployment guide). About seven minutes end to end.
 
@@ -100,6 +102,48 @@ closed-form stand-in that produces fields of the right shape, scale, and interna
 consistency. Every file it writes is overwritten by the R pipeline. The index it
 produces is stamped `"fixture": true`, which the app surfaces in the UI, so fixture
 numbers can never be mistaken for real ones.
+
+### Tries
+
+The two-point page has a pipeline of its own, the same shape as the 4th-down
+one: `scripts/extract-2pt.R` pulls every play that recorded an extra point or a
+two-point result, prices both options with `nfl4th::add_2pt_probs()`, and
+writes one file per team to `public/data/twopt/teams/` plus the raw team
+metadata to `public/data/twopt/index.json`; `npm run data:index:twopt` then
+adds the precomputed summaries and the quiz pool. The three files under
+`public/data/twopt/` have exactly the shapes of the three at `public/data/`,
+which is what lets one `LeagueIndex` type, one data client and one set of
+hooks serve both pages.
+
+```bash
+Rscript scripts/extract-2pt.R          # every season, 2015 to the current one: ~6 minutes
+Rscript scripts/extract-2pt.R 2026     # one season, merged into the team files
+npm run data:index:twopt
+```
+
+**2015 is the floor, and it is a modelling floor.** That is the season the
+extra point moved back to the 15, and nfl4th prices every kick from there —
+`add_2pt_probs()` evaluates the field-goal model at `yardline_100 = 15`
+whatever the play says. Before 2015 the kick was a 99.5% snap from the 2, and
+the model would be pricing a decision no staff faced. The data through 2025 is
+15,362 tries across all 32 teams.
+
+Two things nfl4th does that the interface has to say out loud:
+
+- **The spot is not an input.** A penalty can move a try — a kick from the
+  20, a two from the 1 — and the play-by-play records it, but the extra point
+  is priced from the 15 and the two-point try from the 2 regardless. The card
+  shows a moved spot as a fact; the About dialog says the model ignored it.
+- **Nothing is priced in the last fifteen seconds or in overtime.** A try with
+  the clock gone cannot change who wins, so `add_2pt_probs()` returns NA and
+  the extract drops those rows, about ten a season, with a line in the log.
+
+The extract restates one number the way `extract.R` restates the final
+scores: `go_boost = 100 × (wp_go2 − wp_go1)`, the win probability points gained
+by going for two rather than kicking. nfl4th does not emit it for tries, but
+the whole interface reads the model's recommendation off the sign of the
+headline number rather than from a raw argmax, and a try needs the same
+guarantee that the verdict can never contradict the number beside it.
 
 ### Garbage time
 
@@ -175,6 +219,75 @@ commented where it sits. The ones worth knowing about:
   Its rule for what counts is not reconstructable from the play-by-play: a
   kickoff recovered in the end zone by the kicking team counts, a muffed punt
   recovered the same way does not.
+
+## 2-Point Stats
+
+A page at `/twopoint`: the decision after every touchdown, reviewed exactly the
+way the 4th-down page reviews a 4th down. The same team picker, the same banner,
+the same drill-down to the individual try, the same comparison card, the same
+season summary, its own league trends at `/twopoint/trends` and its own quiz at
+`/twopoint/quiz`, with the same About button opening a dialog written for tries.
+
+It is the same page because it is the same code. A 4th down and a try are the
+same shape of question — the staff picked one option, the model priced every
+option, and the gap between them is the cost — with different options. So
+everything downstream of the pricing is written once against a small interface,
+`DecisionRules` in `src/lib/rules.ts`: the choices, which one counts as
+aggressive, what the staff did, what the model wanted, what each option was
+worth, and how each choice is written. The 4th-down rules are `FOURTH_DOWN` in
+`src/lib/decision.ts` and the try rules are `TWO_POINT` in `src/lib/twopt.ts`;
+team summaries, game roll-ups, impact tiers, the decision matrix, the quiz
+scoring and the trends take whichever they are handed. The 4th-down page keeps
+its original function names as one-line bindings, so nothing that page calls had
+to change.
+
+What is different is what a try is:
+
+- **Two options, never unavailable.** Kick, or go for two. There is no
+  situation where a team may not do either, so nothing on the card is null and
+  the matrix is 2x2 rather than 3x3.
+- **The situation is the score.** A try has no down, distance or field position
+  worth stating, so a row reads "Up 6 after the TD" — `score_differential` on
+  the try row, which nflfastR states after the touchdown — and the card's first
+  fact is what each option does to it: *kick → up 7 · two → up 8*. That is the
+  whole decision, and it is what a coach is actually thinking about.
+- **Both options get their branches drawn.** The 4th-down card draws only the
+  go, because a punt has one outcome. An extra point has two, and at 94% the
+  miss is a real branch of the decision rather than a footnote to it, so the
+  card shows *If they go for two* and *If they kick* side by side, through the
+  same `BranchSplit` component.
+- **The strength band and the cost tiers are unchanged.** A coin flip is still
+  under a point, a clear call still over three. That matters here because of
+  what the distribution turns out to be.
+
+### What it shows
+
+Across 2015–2025, **76% of tries are coin flips**, 23% leans and 1.4% clear
+calls. An extra point is worth about 0.94 points and a two-point try about
+1.0, so with a game still open the two options usually sit within a fraction
+of a win-probability point of each other. The model prefers going for two on
+about **60% of tries** — most of them by a hair — and staffs go for two on
+about **7% of those**, a figure that has not moved in eleven seasons:
+
+| Metric | Median team, 2015 → 2025 |
+|---|---|
+| Aggressiveness | 7% → 7% |
+| How often the model said go for two | 60% → 58% |
+| Agreement | 44% → 43% |
+| Win probability given up, per game | 1.14 → 1.12 |
+
+Where 4th downs moved over a decade, tries did not. The kick is the default,
+and a coin flip does not move a staff off a default. The About dialog says so
+in as many words, because a page where every staff reads at 5–12% aggressive
+and 35–45% agreement looks broken until the reader knows the calls are hairline
+— and it then points at the number that does the work, which is the cost. At
+about 1.1 points a game a season of tries gives up roughly a fifth of a win,
+more than half of what the same staff gives up on 4th downs.
+
+The quiz deals four of its ten as situations the model would go for two on,
+the same fixed four as the 4th-down quiz, so the two scorecards read against
+each other; the sample-size line counts against the ~45 tries a team faces in a
+season rather than the ~130 4th downs.
 
 ## League trends
 
@@ -286,11 +399,13 @@ gesture as reading which one you are on.
 
 The registry is `SECTIONS` in `src/lib/routes.ts`. **Adding a page is one entry
 there** — title, blurb, and the view it routes to — and it appears in the menu on
-every other page with nothing else to wire up.
+every other page with nothing else to wire up. The two nfl4th pages sit next to
+each other in the menu, with garbage time after them.
 
 League trends and the quiz are deliberately not sections. They are ways of
-reading the 4th-down data rather than separate bodies of it, so they stay on that
-page's own header where they have always been.
+reading a page's data rather than separate bodies of it, so they stay on that
+page's own header where they have always been — the 4th-down ones at `/trends`
+and `/quiz`, the two-point ones at `/twopoint/trends` and `/twopoint/quiz`.
 
 ## Garbage time
 
@@ -649,23 +764,29 @@ src/
   types.ts                shapes of the static data and the derived domain types
   data/client.ts          the only module that talks to storage, behind a DataSource interface
   hooks/                  useTeamData, useLeagueIndex — fetch, cache, loading state
-  lib/decision.ts         the decision rules: actual choice, model choice, cost, band
+  hooks/useDrilldown.ts   team, season, week, quarter, open play — the state both pages share
+  lib/rules.ts            DecisionRules: what a kind of decision must say about itself
+  lib/decision.ts         the 4th-down rules: actual choice, model choice, cost, band
+  lib/twopt.ts            the try rules: kick or two
   lib/metrics.ts          team tendency metrics, shared with the build script
   lib/filters.ts          the season / week / quarter drill-down
   lib/scale.ts            the shared, floor-limited axis the option bars sit on
   lib/color.ts            team colour with contrast checks
   lib/zones.ts            the two axes of the deviation grid
   components/
+    TeamExplorer.tsx      the drill-down shell: banner, filters, list, summary or card
     TeamPicker.tsx        all 32 teams by division, in their own colours
     TeamBanner.tsx        sticky identity: team, season, plays in scope
     PlayFilters.tsx       season, then week, then quarter
-    PlayList.tsx          every 4th down in the filter
+    PlayList.tsx          every decision in the filter, grouped by game
     ComparisonCard.tsx    one 4th down, reviewed
-    decision/             the parts of that card
+    decision/             the parts of that card, shared with the try card
+    twopt/                the try row, card, quiz situation and About dialog
 scripts/
   extract.R               stage 1: nfl4th -> public/data/
-  build-index.ts          stage 2: precomputed summaries -> public/data/index.json
-  make-fixture.mjs        stand-in data for development
+  extract-2pt.R           stage 1 for tries: nfl4th -> public/data/twopt/
+  build-index.ts          stage 2: precomputed summaries -> index.json, for either
+  make-fixture.mjs        stand-in data for development, both pipelines
 ```
 
 ## The drill-down
@@ -773,6 +894,7 @@ colour filled it.
 | `npm run typecheck` | `tsc -b` |
 | `npm run lint` | oxlint |
 | `npm run data:index` | rebuild `index.json` from real data |
-| `npm run data:fixture` | regenerate fixture data and rebuild `index.json` |
+| `npm run data:index:twopt` | rebuild `twopt/index.json` and the try quiz pool |
+| `npm run data:fixture` | regenerate fixture data and rebuild both indexes |
 | `npm run data:garbage:check` | validate `public/data/garbage/` through `src/lib` |
-| `npm run data:update` | top up the current season in both pipelines; `-- --deploy` pushes the data |
+| `npm run data:update` | top up the current season in every pipeline; `-- --deploy` pushes the data |

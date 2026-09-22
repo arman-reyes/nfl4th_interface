@@ -1,14 +1,18 @@
-import type { Choice, QuizPlay } from '../types'
-import { modelChoice, wpOf } from './decision'
+import type { Choice, QuizPlay, Situation } from '../types'
+import { FOURTH_DOWN } from './decision'
 import { playKey } from './filters'
+import { forfeitedBy } from './rules'
+import type { DecisionRules } from './rules'
 
 /**
- * A round of the quiz: ten real 4th downs, the reader's call on each, and how
+ * A round of the quiz: ten real decisions, the reader's call on each, and how
  * that scores against the model.
  *
  * The scoring deliberately mirrors the team profile — aggressiveness,
  * agreement, win probability given up — so a reader's own numbers can be read
- * against a coaching staff's without translation.
+ * against a coaching staff's without translation. It is written against the
+ * decision rules, so the 4th-down quiz and the two-point quiz are one quiz
+ * with different questions.
  */
 
 export const QUESTIONS_PER_ROUND = 10
@@ -16,11 +20,13 @@ export const QUESTIONS_PER_ROUND = 10
 export const SECONDS_PER_QUESTION = 20
 
 /**
- * How many of the ten the model would go for.
+ * How many of the ten the model would take the aggressive option on.
  *
  * Fixed rather than left to chance for two reasons: aggressiveness needs a
- * denominator, and 4 in 10 is close to the league's real rate of about 41%, so
- * the round still feels like a season.
+ * denominator, and 4 in 10 is close to the league's real rate of about 41% on
+ * 4th down, so the round still feels like a season. On tries the model leans
+ * to two on rather more than that, but a fixed four keeps the two quizzes
+ * comparable and stops a round being all coin flips one way.
  */
 const GO_QUESTIONS = 4
 
@@ -57,21 +63,22 @@ function shuffle<T>(items: T[], random: () => number): T[] {
  * unseen pool cannot fill a round, it falls back to the whole pool rather than
  * dealing short.
  */
-export function pickQuestions(
-  pool: QuizPlay[],
+export function pickQuestionsWith<P extends Situation, C extends string>(
+  rules: DecisionRules<P, C>,
+  pool: P[],
   random: () => number = Math.random,
   count = QUESTIONS_PER_ROUND,
   seen: ReadonlySet<string> = new Set(),
-): QuizPlay[] {
+): P[] {
   const unseen = pool.filter((p) => !seen.has(playKey(p)))
   const source = unseen.length >= count ? unseen : pool
 
   const goes = shuffle(
-    source.filter((p) => modelChoice(p) === 'go'),
+    source.filter((p) => rules.model(p) === rules.aggressive),
     random,
   )
   const others = shuffle(
-    source.filter((p) => modelChoice(p) !== 'go'),
+    source.filter((p) => rules.model(p) !== rules.aggressive),
     random,
   )
 
@@ -85,31 +92,42 @@ export function pickQuestions(
   return shuffle(picked, random)
 }
 
-export interface Answer {
-  play: QuizPlay
-  /** Null when the clock ran out before a call was made. */
-  choice: Choice | null
+export function pickQuestions(
+  pool: QuizPlay[],
+  random: () => number = Math.random,
+  count = QUESTIONS_PER_ROUND,
+  seen: ReadonlySet<string> = new Set(),
+): QuizPlay[] {
+  return pickQuestionsWith(FOURTH_DOWN, pool, random, count, seen)
 }
 
-export interface Verdict {
-  model: Choice
+export interface Answer<P extends Situation = QuizPlay, C extends string = Choice> {
+  play: P
+  /** Null when the clock ran out before a call was made. */
+  choice: C | null
+}
+
+export interface Verdict<C extends string = Choice> {
+  model: C
   matched: boolean
   /** Win probability points given up, in percentage points. Zero when matched. */
   cost: number
 }
 
 /** Scores one call against the model. Null when no call was made. */
-export function judge(answer: Answer): Verdict | null {
+export function judgeWith<P extends Situation, C extends string>(
+  rules: DecisionRules<P, C>,
+  answer: Answer<P, C>,
+): Verdict<C> | null {
   if (answer.choice === null) return null
-  const model = modelChoice(answer.play)
-  const chosen = wpOf(answer.play, answer.choice)
-  const best = wpOf(answer.play, model)
-  if (chosen === null || best === null) return null
-  return {
-    model,
-    matched: answer.choice === model,
-    cost: Math.max(0, (best - chosen) * 100),
-  }
+  const model = rules.model(answer.play)
+  const cost = forfeitedBy(rules, answer.play, answer.choice)
+  if (cost === null) return null
+  return { model, matched: answer.choice === model, cost }
+}
+
+export function judge(answer: Answer): Verdict | null {
+  return judgeWith(FOURTH_DOWN, answer)
 }
 
 export interface QuizScore {
@@ -128,7 +146,10 @@ export interface QuizScore {
   forfeitedPerDecision: number
 }
 
-export function scoreRound(answers: Answer[]): QuizScore {
+export function scoreRoundWith<P extends Situation, C extends string>(
+  rules: DecisionRules<P, C>,
+  answers: Answer<P, C>[],
+): QuizScore {
   let decisions = 0
   let timedOut = 0
   let matched = 0
@@ -144,14 +165,14 @@ export function scoreRound(answers: Answer[]): QuizScore {
       timedOut += 1
       continue
     }
-    const verdict = judge(answer)
+    const verdict = judgeWith(rules, answer)
     if (verdict === null) continue
     decisions += 1
     if (verdict.matched) matched += 1
     forfeited += verdict.cost
-    if (verdict.model === 'go') {
+    if (verdict.model === rules.aggressive) {
       goRecommended += 1
-      if (answer.choice === 'go') goTaken += 1
+      if (answer.choice === rules.aggressive) goTaken += 1
     }
   }
 
@@ -166,4 +187,8 @@ export function scoreRound(answers: Answer[]): QuizScore {
     forfeited,
     forfeitedPerDecision: decisions > 0 ? forfeited / decisions : 0,
   }
+}
+
+export function scoreRound(answers: Answer[]): QuizScore {
+  return scoreRoundWith(FOURTH_DOWN, answers)
 }

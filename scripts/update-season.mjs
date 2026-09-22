@@ -4,13 +4,13 @@
  *   npm run data:update                       # current season, both pipelines
  *   npm run data:update -- --season 2026      # a specific season
  *   npm run data:update -- --deploy           # ...and push the data to S3
- *   npm run data:update -- --only garbage     # one pipeline (fourth | garbage)
+ *   npm run data:update -- --only garbage     # one pipeline (fourth | twopt | garbage)
  *
  * Run it Tuesday morning: nflverse rebuilds its play-by-play overnight after
  * the last game of the week. Run earlier and the newest week is partial.
  *
- * Both R scripts already merge a single season into what is on disk, so this
- * only sequences them, rebuilds the derived files, validates, builds, and -
+ * All three R scripts already merge a single season into what is on disk, so
+ * this only sequences them, rebuilds the derived files, validates, builds, and -
  * when asked - syncs dist/data/ to the bucket and invalidates the edge cache.
  * A failure anywhere stops it before the deploy. Code changes are not
  * deployed here; those follow deploymentREADME.md.
@@ -24,6 +24,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 
 const INDEX_PATH = 'public/data/index.json'
+const TWOPT_INDEX_PATH = 'public/data/twopt/index.json'
 const SEASONS_PATH = 'public/data/garbage/seasons.json'
 const ENV_PATH = '.env.deploy.local'
 const win = process.platform === 'win32'
@@ -40,11 +41,12 @@ const { values: opts } = parseArgs({
     only: { type: 'string' },
   },
 })
-if (opts.only && !['fourth', 'garbage'].includes(opts.only)) {
-  fail(`--only must be "fourth" or "garbage", not "${opts.only}"`)
+if (opts.only && !['fourth', 'twopt', 'garbage'].includes(opts.only)) {
+  fail(`--only must be "fourth", "twopt" or "garbage", not "${opts.only}"`)
 }
-const runFourth = opts.only !== 'garbage'
-const runGarbage = opts.only !== 'fourth'
+const runFourth = !opts.only || opts.only === 'fourth'
+const runTwoPoint = !opts.only || opts.only === 'twopt'
+const runGarbage = !opts.only || opts.only === 'garbage'
 
 // Resolved up front so a missing setting fails now, not after the pipeline.
 let target = null
@@ -80,10 +82,10 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf-8'))
 }
 
-function readIndex() {
-  if (!existsSync(INDEX_PATH)) fail(`${INDEX_PATH} is missing; run the full pipeline first (README.md)`)
-  const index = readJson(INDEX_PATH)
-  if (Array.isArray(index)) fail(`${INDEX_PATH} is the raw R output; run npm run data:index first`)
+function readIndex(path = INDEX_PATH) {
+  if (!existsSync(path)) fail(`${path} is missing; run the full pipeline first (README.md)`)
+  const index = readJson(path)
+  if (Array.isArray(index)) fail(`${path} is the raw R output; run npm run data:index first`)
   return index
 }
 
@@ -118,6 +120,19 @@ if (runFourth) {
   if (index.fixture) fail('index.json came out stamped as fixture data')
   if (!index.seasons.includes(season)) {
     fail(`index.json has no ${season} season after the extract - nothing scored? see the extract log`)
+  }
+}
+
+// --- tries ------------------------------------------------------------------
+
+if (runTwoPoint) {
+  run('Rscript', ['scripts/extract-2pt.R', String(season)])
+  run('node', ['--import', 'tsx', 'scripts/build-index.ts', '--twopt'])
+
+  const index = readIndex(TWOPT_INDEX_PATH)
+  if (index.fixture) fail('twopt/index.json came out stamped as fixture data')
+  if (!index.seasons.includes(season)) {
+    fail(`twopt/index.json has no ${season} season after the extract - nothing scored? see the extract log`)
   }
 }
 
@@ -158,6 +173,7 @@ function liveSeasons(bucket, key, pick) {
 if (target) {
   const checks = [
     ['data/index.json', (d) => d.seasons, readIndex().seasons],
+    ['data/twopt/index.json', (d) => d.seasons, readIndex(TWOPT_INDEX_PATH).seasons],
     ['data/garbage/seasons.json', (d) => d, readJson(SEASONS_PATH)],
   ]
   for (const [key, pick, local] of checks) {
@@ -211,6 +227,19 @@ if (runFourth) {
     `  4th downs:     ${fourthDowns} plays across ${index.teams.length} teams` +
       (progress?.season === season
         ? `, in progress through week ${progress.through_week}`
+        : ', season complete'),
+  )
+}
+if (runTwoPoint) {
+  const twopt = readIndex(TWOPT_INDEX_PATH)
+  const tries = twopt.teams.reduce(
+    (sum, team) => sum + (team.summaries.find((s) => s.season === season)?.plays ?? 0),
+    0,
+  )
+  lines.push(
+    `  tries:         ${tries} across ${twopt.teams.length} teams` +
+      (twopt.in_progress?.season === season
+        ? `, in progress through week ${twopt.in_progress.through_week}`
         : ', season complete'),
   )
 }

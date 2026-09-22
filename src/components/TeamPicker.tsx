@@ -8,6 +8,12 @@ interface Props {
   teams: TeamIndexEntry[]
   /** True when the loaded data is generated fixtures rather than model output. */
   fixture: boolean
+  /** Which page this picker fronts, for the heading. */
+  current: ViewName
+  /** The line under the heading: what picking a team gets you. */
+  intro: React.ReactNode
+  /** The quiz call-to-action at the foot of the page. */
+  quiz: { title: string; blurb: string }
   onSelect: (abbr: TeamAbbr) => void
   onAbout: () => void
   onTrends: () => void
@@ -20,10 +26,13 @@ const CONFERENCES = ['AFC', 'NFC'] as const
 /** The order the NFL prints them in, not alphabetical. */
 const DIVISIONS = ['East', 'North', 'South', 'West'] as const
 
-/** Step one of the drill-down: whose 4th downs are we looking at. */
+/** Step one of the drill-down: whose decisions are we looking at. */
 export function TeamPicker({
   teams,
   fixture,
+  current,
+  intro,
+  quiz,
   onSelect,
   onAbout,
   onTrends,
@@ -34,7 +43,7 @@ export function TeamPicker({
     <div className="space-y-8">
       <div>
         <div className="flex items-start justify-between gap-4">
-          <SectionNav current="teams" onNavigate={onNavigate} />
+          <SectionNav current={current} onNavigate={onNavigate} />
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={onTrends}
@@ -45,18 +54,7 @@ export function TeamPicker({
             <AboutButton onClick={onAbout} tone="muted" />
           </div>
         </div>
-        <p className="mt-1 text-sm text-stone-500">
-          Pick a team to review every 4th down they faced, and what the models from{' '}
-          <a
-            href="https://www.nfl4th.com/"
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-stone-700 underline decoration-stone-400 underline-offset-2 transition-colors hover:text-stone-900"
-          >
-            nfl4th
-          </a>{' '}
-          would have done.
-        </p>
+        <p className="mt-1 text-sm text-stone-500">{intro}</p>
         {fixture && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200 ring-inset">
             Fixture data — generated stand-ins, not nfl4th output. Run the R pipeline and{' '}
@@ -94,10 +92,10 @@ export function TeamPicker({
         className="group w-full rounded-lg bg-stone-900 px-5 py-6 text-left transition-colors hover:bg-stone-800 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none sm:px-7 sm:py-7"
       >
         <span className="block text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-          Think you can make the right call on 4th down?
+          {quiz.title}
         </span>
         <span className="mt-1.5 flex items-center gap-2 text-sm text-stone-300">
-          Ten real situations, twenty seconds each — then see how you score against the model.
+          {quiz.blurb}
           <span aria-hidden className="transition-transform group-hover:translate-x-1">
             →
           </span>

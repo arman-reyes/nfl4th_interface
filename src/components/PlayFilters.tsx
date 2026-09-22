@@ -1,10 +1,10 @@
-import type { Play, TeamMeta } from '../types'
+import type { Situation, TeamMeta } from '../types'
 import type { PlayFilter } from '../lib/filters'
 import { ALL, quarterLabelShort, quartersOf, weekLabel, weeksOf } from '../lib/filters'
 import { teamSurface } from '../lib/color'
 
 interface Props {
-  plays: Play[]
+  plays: Situation[]
   team: TeamMeta
   filter: PlayFilter
   onChange: (filter: PlayFilter) => void

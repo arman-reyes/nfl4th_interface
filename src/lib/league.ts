@@ -60,6 +60,33 @@ export const LEAGUE_METRICS: LeagueMetric[] = [
   },
 ]
 
+/**
+ * The same four numbers for the try, with the captions written for it. The
+ * value functions are shared: a TeamSummary means the same thing on both
+ * pages, only what "go" refers to changes.
+ */
+export const TWO_POINT_METRICS: LeagueMetric[] = [
+  {
+    ...LEAGUE_METRICS[0],
+    caption: 'Of the tries where the model said go for two, the share teams actually went for.',
+  },
+  {
+    ...LEAGUE_METRICS[1],
+    label: 'How often the model said go for two',
+    caption:
+      'The share of tries where two was the better option. A property of the scores and clocks teams faced, not of what they did about them.',
+  },
+  {
+    ...LEAGUE_METRICS[2],
+    caption: "The share of tries where the call matched the model's better option.",
+  },
+  {
+    ...LEAGUE_METRICS[3],
+    caption:
+      'Points of win probability handed away per game on tries. A hundred points is one win, so a season at this rate is about a fifth of a win — more than half of what 4th downs cost.',
+  },
+]
+
 export interface SeasonSpread {
   season: number
   /** Lower quartile, median and upper quartile across the 32 teams. */

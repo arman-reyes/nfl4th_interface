@@ -1,37 +1,49 @@
-import type { Choice, QuizPlay } from '../../types'
-import { band, CHOICE_LABEL, CHOICE_VERB, wpOf } from '../../lib/decision'
+import type { Situation } from '../../types'
+import { band } from '../../lib/decision'
 import { pct, pointsGap } from '../../lib/format'
-import { judge } from '../../lib/quiz'
+import { judgeWith } from '../../lib/quiz'
+import type { DecisionRules } from '../../lib/rules'
 import { axisFraction, optionWindow } from '../../lib/scale'
-import { QuizSituation } from './QuizSituation'
+import type { QuizCopy } from './copy'
 
-interface Props {
-  play: QuizPlay
-  choice: Choice | null
+interface Props<P extends Situation, C extends string> {
+  rules: DecisionRules<P, C>
+  copy: QuizCopy
+  play: P
+  choice: C | null
   number: number
   total: number
+  /** The situation again, compact, so the call can be read against it. */
+  situation: React.ReactNode
   onNext: () => void
 }
-
-const ORDER: Choice[] = ['go', 'fg', 'punt']
 
 /**
  * What the model wanted, set against the call just made.
  *
- * It shows the three options and the gap between them, and stops there. What
- * the play actually gained is never shown — the quiz is scored on the decision,
+ * It shows the options and the gap between them, and stops there. What the
+ * play actually gained is never shown — the quiz is scored on the decision,
  * and revealing the outcome would teach the opposite lesson.
  */
-export function QuizReveal({ play, choice, number, total, onNext }: Props) {
-  const verdict = judge({ play, choice })
-  const values = ORDER.map((option) => ({ option, wp: wpOf(play, option) }))
+export function QuizReveal<P extends Situation, C extends string>({
+  rules,
+  copy,
+  play,
+  choice,
+  number,
+  total,
+  situation,
+  onNext,
+}: Props<P, C>) {
+  const verdict = judgeWith(rules, { play, choice })
+  const values = rules.choices.map((option) => ({ option, wp: rules.wp(play, option) }))
   const window = optionWindow(values.filter((v) => v.wp !== null).map((v) => v.wp! * 100))
 
   return (
     <div className="space-y-4">
       {/* The situation stays up so the call can be read against it, and so the
           next button never lands where the answer buttons just were. */}
-      <QuizSituation play={play} compact />
+      {situation}
 
       <div
         className={`rounded-lg px-5 py-4 ${
@@ -46,20 +58,20 @@ export function QuizReveal({ play, choice, number, total, onNext }: Props) {
           {verdict === null
             ? 'Out of time — no call'
             : verdict.matched
-              ? `Agreed — the model said ${CHOICE_VERB[verdict.model]}`
-              : `The model said ${CHOICE_VERB[verdict.model]}`}
+              ? `Agreed — the model said ${rules.copy[verdict.model].verb}`
+              : `The model said ${rules.copy[verdict.model].verb}`}
         </p>
         <p className="tnum mt-1 text-sm opacity-90">
           {verdict === null ? (
             <>This one is left out of your numbers, the way a penalty would be.</>
           ) : verdict.matched ? (
             <>
-              A {band(play.go_boost)} call, {pointsGap(Math.abs(play.go_boost))} points between
-              going and the best kick.
+              A {band(rules.boost(play))} call, {pointsGap(Math.abs(rules.boost(play)))} points{' '}
+              {copy.edge}.
             </>
           ) : (
             <>
-              You said {CHOICE_VERB[choice as Choice]}. That gave up{' '}
+              You said {rules.copy[choice as C].verb}. That gave up{' '}
               <span className="font-bold">{pointsGap(verdict.cost)}</span> points of win
               probability.
             </>
@@ -78,7 +90,7 @@ export function QuizReveal({ play, choice, number, total, onNext }: Props) {
                   isModel ? 'text-stone-900' : 'text-stone-400'
                 }`}
               >
-                {CHOICE_LABEL[option]}
+                {rules.copy[option].label}
               </span>
               <span className="relative h-7 flex-1 overflow-hidden rounded-sm bg-stone-100">
                 {wp === null ? (
@@ -111,7 +123,7 @@ export function QuizReveal({ play, choice, number, total, onNext }: Props) {
         onClick={onNext}
         className="w-full rounded-lg bg-stone-900 py-3.5 text-base font-bold tracking-wide text-white uppercase hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none"
       >
-        {number === total ? 'See your results' : 'Next 4th down'}
+        {number === total ? 'See your results' : `Next ${copy.noun[0]}`}
       </button>
     </div>
   )

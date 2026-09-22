@@ -1,20 +1,20 @@
-import type { Choice, Play } from '../../types'
-import { CHOICE_LABEL, wpOf } from '../../lib/decision'
 import { axisFraction, optionWindow } from '../../lib/scale'
 import { pct, points } from '../../lib/format'
 
-const ORDER: Choice[] = ['go', 'fg', 'punt']
-
-interface Props {
-  play: Play
-  recommended: Choice
-  actual: Choice | null
+/** One option, already priced and labelled by the page that owns it. */
+export interface OptionRow {
+  key: string
+  label: string
+  /** Expected win probability, 0-1; null where the option did not exist. */
+  wp: number | null
+  /** Context under the label: the conversion rate, the kick distance. */
+  detail: string | null
+  model: boolean
+  actual: boolean
 }
 
-interface Row {
-  choice: Choice
-  wp: number | null
-  detail: string | null
+interface Props {
+  rows: OptionRow[]
 }
 
 /**
@@ -22,14 +22,13 @@ interface Row {
  * zoomed axis the whole app uses; it is there so the size of the gap is
  * visible, and it drops out below the small breakpoint where the numbers
  * have to carry it alone.
+ *
+ * The table knows nothing about which decision it is drawing. The page hands
+ * it rows already priced and tagged, which is what lets three 4th-down
+ * options and two try options come through the same component.
  */
-export function OptionsTable({ play, recommended, actual }: Props) {
-  const rows: Row[] = ORDER.map((choice) => ({
-    choice,
-    wp: wpOf(play, choice),
-    detail: detailFor(play, choice),
-  })).sort((a, b) => (b.wp ?? -1) - (a.wp ?? -1))
-
+export function OptionsTable({ rows: given }: Props) {
+  const rows = [...given].sort((a, b) => (b.wp ?? -1) - (a.wp ?? -1))
   const best = rows[0]?.wp ?? null
   const window = optionWindow(rows.filter((r) => r.wp !== null).map((r) => r.wp! * 100))
 
@@ -57,19 +56,19 @@ export function OptionsTable({ play, recommended, actual }: Props) {
         </thead>
         <tbody>
           {rows.map((row) => {
-            const isBest = row.choice === recommended
+            const isBest = row.model
             const gap = row.wp === null || best === null ? null : (row.wp - best) * 100
             return (
-              <tr key={row.choice} className="border-b border-stone-100 align-middle">
+              <tr key={row.key} className="border-b border-stone-100 align-middle">
                 <td className="py-3 pr-3">
                   <div
                     className={`text-base font-semibold ${isBest ? 'text-stone-900' : 'text-stone-600'}`}
                   >
-                    {CHOICE_LABEL[row.choice]}
+                    {row.label}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     {isBest && <Tag tone="model">model</Tag>}
-                    {actual === row.choice && <Tag tone="actual">on the field</Tag>}
+                    {row.actual && <Tag tone="actual">on the field</Tag>}
                     {row.detail && (
                       <span className="text-xs text-stone-500">{row.detail}</span>
                     )}
@@ -109,15 +108,6 @@ export function OptionsTable({ play, recommended, actual }: Props) {
       </p>
     </section>
   )
-}
-
-function detailFor(play: Play, choice: Choice): string | null {
-  if (choice === 'go') return `converts ${pct(play.first_down_prob)} of the time`
-  if (choice === 'fg') {
-    if (play.fg_make_prob === null) return null
-    return `${play.yardline_100 + 17} yards, ${pct(play.fg_make_prob)} make`
-  }
-  return null
 }
 
 function Tag({ tone, children }: { tone: 'model' | 'actual'; children: string }) {

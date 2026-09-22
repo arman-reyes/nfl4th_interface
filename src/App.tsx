@@ -1,98 +1,55 @@
-import { useMemo, useState } from 'react'
-import { useLeagueIndex, useTeamData } from './hooks/useTeamData'
-import { ALL, applyFilter, playKey, reconcile, seasonsOf } from './lib/filters'
-import type { PlayFilter } from './lib/filters'
-import { playsInSeason } from './lib/metrics'
-import type { GameSummary } from './lib/games'
-import type { Play, TeamAbbr } from './types'
+import { useState } from 'react'
+import { useLeagueIndex, useTwoPointIndex } from './hooks/useTeamData'
+import { useDrilldown } from './hooks/useDrilldown'
+import { useRoute } from './hooks/useRoute'
+import { dataSource } from './data/client'
+import { FOURTH_DOWN } from './lib/decision'
+import { TWO_POINT } from './lib/twopt'
+import { LEAGUE_METRICS, TWO_POINT_METRICS } from './lib/league'
+import type { Movement } from './lib/league'
+import type { Play, Try } from './types'
 import { ComparisonCard } from './components/ComparisonCard'
-import { PlayFilters } from './components/PlayFilters'
-import { PlayList } from './components/PlayList'
-import { TeamBanner } from './components/TeamBanner'
+import { PlayRow } from './components/PlayRow'
+import { TeamExplorer, Centered } from './components/TeamExplorer'
 import { TeamPicker } from './components/TeamPicker'
-import { TeamSummary } from './components/TeamSummary'
 import { AboutDialog } from './components/AboutDialog'
 import { LeagueTrends } from './components/LeagueTrends'
 import { QuizPage } from './components/QuizPage'
+import { QuizSituation } from './components/quiz/QuizSituation'
+import { FOURTH_DOWN_QUIZ, TWO_POINT_QUIZ } from './components/quiz/copy'
 import { GarbageTimePage } from './components/GarbageTimePage'
 import { GarbageTrends } from './components/GarbageTrends'
-import { useRoute } from './hooks/useRoute'
+import { TryCard } from './components/twopt/TryCard'
+import { TryRow } from './components/twopt/TryRow'
+import { TryQuizSituation } from './components/twopt/TryQuizSituation'
+import { TwoPointAbout } from './components/twopt/TwoPointAbout'
+
+/** A stable empty list, so a drill-down with no index yet does not re-derive every render. */
+const NO_SEASONS: number[] = []
 
 /**
- * The drill-down: team, season, week, quarter, then the individual 4th down.
- *
- * The team's season summary is the landing view and the resting state; picking
- * a play swaps it for that play's comparison, and clearing the selection —
- * from the back control, or by tapping the selected row again — brings it back.
- *
- * On a wide screen the list and the panel sit side by side. On a phone the
- * summary comes first and the list follows it, and selecting a play replaces
- * both.
+ * The router, and the state that has to outlive a page.
  *
  * The top-level view comes from the URL so every page can be linked to and the
- * back button works; everything below it — the team, the filters, the controls
- * on the garbage-time page — stays in state, because those are a session rather
- * than a place.
+ * back button works. Everything below it — the team, the filters, the open
+ * play, the controls on the garbage-time page — stays in state, because those
+ * are a session rather than a place. The two drill-downs are held here rather
+ * than inside their pages so that stepping out to a trends view or the quiz
+ * and back does not forget the team.
+ *
+ * The 4th-down page and the two-point page are the same experience over
+ * different decisions: the same picker, banner, list, summary, trends and
+ * quiz, each handed that page's rules, data and words.
  */
 export default function App() {
   const index = useLeagueIndex()
   const [view, navigate] = useRoute()
-  const [abbr, setAbbr] = useState<TeamAbbr | null>(null)
-  // What the user last asked for. The filter in force is derived from it during
-  // render, because a team's real seasons and weeks are only known once that
-  // team's data has arrived.
-  const [intent, setIntent] = useState<PlayFilter | null>(null)
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const onTwoPoint = view === 'twopt' || view === 'twoptTrends' || view === 'twoptQuiz'
+  const twoIndex = useTwoPointIndex(onTwoPoint)
+  const fourth = useDrilldown<Play>(dataSource.loadTeamPlays, index.data?.seasons ?? NO_SEASONS)
+  const two = useDrilldown<Try>(dataSource.loadTwoPointTeam, twoIndex.data?.seasons ?? NO_SEASONS)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const team = useTeamData(abbr)
-
-  const meta = index.data?.teams.find((t) => t.team_abbr === abbr)
-  const plays = team.data
-  const filter = useMemo(() => (plays ? reconcile(plays, intent) : null), [plays, intent])
-
-  const visible = useMemo(
-    () => (plays && filter ? applyFilter(plays, filter) : []),
-    [plays, filter],
-  )
-  const seasonCount = useMemo(
-    () => (plays && filter ? playsInSeason(plays, filter.season).length : 0),
-    [plays, filter],
-  )
-  const selected = visible.find((p) => playKey(p) === selectedKey) ?? null
-  // The banner's season list. Until the team's plays arrive it is the league's
-  // seasons, so the picker is never empty while a team is loading.
-  const seasons = useMemo(
-    () => (plays ? seasonsOf(plays) : (index.data?.seasons ?? [])),
-    [plays, index.data],
-  )
-
-  function chooseTeam(next: TeamAbbr) {
-    setAbbr(next)
-    setSelectedKey(null)
-  }
-
-  function changeFilter(next: PlayFilter) {
-    setIntent(next)
-    setSelectedKey(null)
-  }
-
-  /** A new season resets the week and quarter beneath it. */
-  function changeSeason(season: number) {
-    changeFilter({ season, week: ALL, qtr: ALL })
-  }
-
-  /** Tapping the open row again closes it, back to the summary. */
-  function togglePlay(play: Play) {
-    const key = playKey(play)
-    setSelectedKey((current) => (current === key ? null : key))
-  }
-
-  /** Narrow the list to one game, and return to the summary. */
-  function focusGame(game: GameSummary) {
-    if (!filter) return
-    setIntent({ season: filter.season, week: game.week, qtr: ALL })
-    setSelectedKey(null)
-  }
+  const [twoAboutOpen, setTwoAboutOpen] = useState(false)
 
   if (index.loading) return <Centered>Loading league…</Centered>
   if (index.error) return <Centered tone="error">{index.error.message}</Centered>
@@ -103,24 +60,6 @@ export default function App() {
   )
   const openAbout = () => setAboutOpen(true)
   const toTeams = () => navigate('teams')
-
-  if (view === 'quiz') {
-    return (
-      <>
-        <QuizPage index={index.data} onBack={toTeams} onAbout={openAbout} />
-        {about}
-      </>
-    )
-  }
-
-  if (view === 'trends') {
-    return (
-      <>
-        <LeagueTrends index={index.data} onBack={toTeams} onAbout={openAbout} />
-        {about}
-      </>
-    )
-  }
 
   if (view === 'garbage') {
     return (
@@ -140,13 +79,159 @@ export default function App() {
     )
   }
 
-  if (!abbr || !meta) {
+  // --- the two-point page and its sub-views --------------------------------
+
+  if (onTwoPoint) {
+    if (twoIndex.loading) return <Centered>Loading tries…</Centered>
+    if (twoIndex.error) return <Centered tone="error">{twoIndex.error.message}</Centered>
+    if (!twoIndex.data) return null
+    const data = twoIndex.data
+    const twoAbout = (
+      <TwoPointAbout open={twoAboutOpen} index={data} onClose={() => setTwoAboutOpen(false)} />
+    )
+    const openTwoAbout = () => setTwoAboutOpen(true)
+    const toTries = () => navigate('twopt')
+
+    if (view === 'twoptQuiz') {
+      return (
+        <>
+          <QuizPage
+            index={data}
+            rules={TWO_POINT}
+            copy={TWO_POINT_QUIZ}
+            loadPool={dataSource.loadTwoPointQuizPool}
+            situation={(play, compact) => <TryQuizSituation play={play} compact={compact} />}
+            onBack={toTries}
+            onAbout={openTwoAbout}
+          />
+          {twoAbout}
+        </>
+      )
+    }
+
+    if (view === 'twoptTrends') {
+      return (
+        <>
+          <LeagueTrends
+            index={data}
+            metrics={TWO_POINT_METRICS}
+            intro={twoPointIntro}
+            backLabel="Teams"
+            onBack={toTries}
+            onAbout={openTwoAbout}
+          />
+          {twoAbout}
+        </>
+      )
+    }
+
+    const meta = data.teams.find((t) => t.team_abbr === two.abbr)
+    if (!two.abbr || !meta) {
+      return (
+        <main className="mx-auto max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
+          <TeamPicker
+            teams={data.teams}
+            fixture={data.fixture}
+            current="twopt"
+            intro={
+              <>
+                Pick a team to review every try they faced — extra point or two — and what the
+                model from <Nfl4th /> would have done.
+              </>
+            }
+            quiz={{
+              title: 'Think you know when to go for two?',
+              blurb:
+                'Ten real tries, twenty seconds each — then see how you score against the model.',
+            }}
+            onSelect={two.chooseTeam}
+            onAbout={openTwoAbout}
+            onTrends={() => navigate('twoptTrends')}
+            onQuiz={() => navigate('twoptQuiz')}
+            onNavigate={navigate}
+          />
+          {twoAbout}
+        </main>
+      )
+    }
+
+    return (
+      <>
+        <TeamExplorer<Try, 'kick' | 'two'>
+          index={data}
+          team={meta}
+          rules={TWO_POINT}
+          drill={two}
+          noun={['try', 'tries']}
+          bannerNoun="tries"
+          verb="went for two"
+          row={(play, selected, onSelect) => (
+            <TryRow play={play} team={meta} selected={selected} onSelect={onSelect} />
+          )}
+          card={(play) => <TryCard play={play} team={meta} />}
+          onAbout={openTwoAbout}
+          onTrends={() => navigate('twoptTrends')}
+        />
+        {twoAbout}
+      </>
+    )
+  }
+
+  // --- the 4th-down page and its sub-views ---------------------------------
+
+  if (view === 'quiz') {
+    return (
+      <>
+        <QuizPage
+          index={index.data}
+          rules={FOURTH_DOWN}
+          copy={FOURTH_DOWN_QUIZ}
+          loadPool={dataSource.loadQuizPool}
+          situation={(play, compact) => <QuizSituation play={play} compact={compact} />}
+          onBack={toTeams}
+          onAbout={openAbout}
+        />
+        {about}
+      </>
+    )
+  }
+
+  if (view === 'trends') {
+    return (
+      <>
+        <LeagueTrends
+          index={index.data}
+          metrics={LEAGUE_METRICS}
+          intro={fourthDownIntro}
+          backLabel="Teams"
+          onBack={toTeams}
+          onAbout={openAbout}
+        />
+        {about}
+      </>
+    )
+  }
+
+  const meta = index.data.teams.find((t) => t.team_abbr === fourth.abbr)
+  if (!fourth.abbr || !meta) {
     return (
       <main className="mx-auto max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
         <TeamPicker
           teams={index.data.teams}
           fixture={index.data.fixture}
-          onSelect={chooseTeam}
+          current="teams"
+          intro={
+            <>
+              Pick a team to review every 4th down they faced, and what the models from <Nfl4th />{' '}
+              would have done.
+            </>
+          }
+          quiz={{
+            title: 'Think you can make the right call on 4th down?',
+            blurb:
+              'Ten real situations, twenty seconds each — then see how you score against the model.',
+          }}
+          onSelect={fourth.chooseTeam}
           onAbout={openAbout}
           onTrends={() => navigate('trends')}
           onQuiz={() => navigate('quiz')}
@@ -158,93 +243,78 @@ export default function App() {
   }
 
   return (
-    // On a wide screen the shell is pinned to the viewport and the two panes
-    // scroll independently, so a long play list never scrolls the summary out
-    // of reach and a tall summary is still fully readable. Pinning rather than
-    // sizing to the viewport keeps the document itself out of the scroll
-    // entirely. On a phone it is ordinary page flow.
-    <div className="lg:fixed lg:inset-0 lg:flex lg:flex-col lg:overflow-hidden">
-      <TeamBanner
+    <>
+      <TeamExplorer<Play, 'go' | 'fg' | 'punt'>
+        index={index.data}
         team={meta}
-        season={filter?.season ?? index.data.seasons[0]}
-        seasons={seasons}
-        plays={seasonCount}
-        throughWeek={
-          index.data.in_progress && index.data.in_progress.season === filter?.season
-            ? index.data.in_progress.through_week
-            : null
-        }
-        onChangeSeason={changeSeason}
-        onChangeTeam={() => setAbbr(null)}
+        rules={FOURTH_DOWN}
+        drill={fourth}
+        noun={['4th down', '4th downs']}
+        bannerNoun="fourth downs"
+        verb="went"
+        row={(play, selected, onSelect) => (
+          <PlayRow play={play} team={meta} selected={selected} onSelect={onSelect} />
+        )}
+        card={(play) => <ComparisonCard play={play} team={meta} />}
         onAbout={openAbout}
         onTrends={() => navigate('trends')}
       />
-
       {about}
-
-      <main className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0">
-        {team.loading && <Centered>Loading {abbr}…</Centered>}
-        {team.error && <Centered tone="error">{team.error.message}</Centered>}
-
-        {plays && filter && (
-          // grid-rows-[minmax(0,1fr)] is what makes the panes scrollable: without
-          // an explicit row track the row sizes to its content, so h-full on a
-          // child resolves against the content height and clips nothing.
-          <div className="grid gap-5 lg:h-full lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-            <div
-              className={`order-2 min-w-0 space-y-3 lg:order-1 lg:h-full lg:min-h-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-6 ${
-                selected ? 'hidden lg:block' : ''
-              }`}
-            >
-              <PlayFilters plays={plays} team={meta} filter={filter} onChange={changeFilter} />
-              {visible.length !== seasonCount && (
-                <p className="px-1 text-[0.6875rem] text-stone-500">
-                  Showing {visible.length} of {seasonCount} this season.
-                </p>
-              )}
-              <PlayList
-                plays={visible}
-                team={meta}
-                selectedKey={selectedKey}
-                onSelect={togglePlay}
-              />
-            </div>
-
-            <div className="order-1 min-w-0 space-y-3 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-6">
-              {selected ? (
-                <>
-                  <button
-                    onClick={() => setSelectedKey(null)}
-                    className="text-sm font-semibold text-stone-500 hover:text-stone-900"
-                  >
-                    ← Season summary
-                  </button>
-                  <ComparisonCard play={selected} team={meta} />
-                </>
-              ) : (
-                <TeamSummary
-                  team={meta}
-                  plays={plays}
-                  season={filter.season}
-                  onSelectGame={focusGame}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+    </>
   )
 }
 
-function Centered({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
+function Nfl4th() {
   return (
-    <p
-      className={`px-3 py-16 text-center text-sm ${
-        tone === 'error' ? 'text-red-700' : 'text-stone-500'
-      }`}
+    <a
+      href="https://www.nfl4th.com/"
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-stone-700 underline decoration-stone-400 underline-offset-2 transition-colors hover:text-stone-900"
     >
-      {children}
-    </p>
+      nfl4th
+    </a>
+  )
+}
+
+const pct = (v: number) => `${(v * 100).toFixed(0)}%`
+
+/** The 4th-down story: the model's advice barely moved, and the league did. */
+function fourthDownIntro([aggressiveness, saidGo]: (Movement | null)[], seasons: number) {
+  if (!aggressiveness || !saidGo) return null
+  return (
+    <>
+      Across these {seasons} seasons the median team went from going for it on{' '}
+      <strong className="tnum font-semibold text-stone-900">{pct(aggressiveness.first.p50)}</strong>{' '}
+      of the 4th downs where the model said go, to{' '}
+      <strong className="tnum font-semibold text-stone-900">{pct(aggressiveness.last.p50)}</strong>
+      . Over the same stretch, how often the model said go barely moved —{' '}
+      <span className="tnum">{pct(saidGo.first.p50)}</span> to{' '}
+      <span className="tnum">{pct(saidGo.last.p50)}</span>. The opportunity was always there;
+      what changed is what teams did with it.
+    </>
+  )
+}
+
+/**
+ * The two-point story, which is that there is not one: a decade after the
+ * kick moved back, the league goes for two about as rarely as it did the
+ * first year, while the model has preferred two on most tries throughout.
+ */
+function twoPointIntro([aggressiveness, saidTwo, , cost]: (Movement | null)[], seasons: number) {
+  if (!aggressiveness || !saidTwo || !cost) return null
+  return (
+    <>
+      Across these {seasons} seasons the median team went for two on{' '}
+      <strong className="tnum font-semibold text-stone-900">{pct(aggressiveness.first.p50)}</strong>{' '}
+      of the tries where the model preferred it, and{' '}
+      <strong className="tnum font-semibold text-stone-900">{pct(aggressiveness.last.p50)}</strong>{' '}
+      by the end — where 4th downs moved, tries did not. The model preferred two on{' '}
+      <span className="tnum">{pct(saidTwo.first.p50)}</span> to{' '}
+      <span className="tnum">{pct(saidTwo.last.p50)}</span> of tries the whole way, most of them
+      by a hair — and a coin flip does not move a staff off the kick. What it costs has held at
+      about <span className="tnum">{cost.last.p50.toFixed(1)}</span> points of win probability a
+      game.
+    </>
   )
 }

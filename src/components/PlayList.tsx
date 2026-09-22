@@ -1,26 +1,29 @@
 import { useMemo } from 'react'
-import type { Play, TeamMeta } from '../types'
+import type { Situation } from '../types'
 import { groupByGame, playKey, weekLongLabel } from '../lib/filters'
 import type { GameResult } from '../lib/filters'
-import { PlayRow } from './PlayRow'
 import { TeamPill } from './TeamPill'
 
-interface Props {
-  plays: Play[]
-  team: TeamMeta
+interface Props<P extends Situation> {
+  plays: P[]
   selectedKey: string | null
-  onSelect: (play: Play) => void
+  onSelect: (play: P) => void
+  /** What a play is called on this page, singular and plural: "4th down". */
+  noun: [string, string]
+  /** One row. The list owns the grouping and the selection; the row owns its content. */
+  row: (play: P, selected: boolean, onSelect: () => void) => React.ReactNode
 }
 
 /**
- * Every 4th down in the current filter, grouped by game. One tap opens the
- * comparison.
+ * Every decision in the current filter, grouped by game. One tap opens the
+ * comparison. The list is the same for a 4th down and a try; only the row is
+ * different, so the row comes in as a render function.
  */
-export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
+export function PlayList<P extends Situation>({ plays, selectedKey, onSelect, noun, row }: Props<P>) {
   const games = useMemo(() => groupByGame(plays), [plays])
 
   if (plays.length === 0) {
-    return <p className="px-1 py-6 text-sm text-stone-500">No 4th downs match this filter.</p>
+    return <p className="px-1 py-6 text-sm text-stone-500">No {noun[1]} match this filter.</p>
   }
 
   return (
@@ -35,22 +38,13 @@ export function PlayList({ plays, team, selectedKey, onSelect }: Props) {
             <TeamPill abbr={game.opponent} />
             {game.result && <Result result={game.result} />}
             <span className="ml-auto font-normal text-stone-400">
-              {game.plays.length} 4th {game.plays.length === 1 ? 'down' : 'downs'}
+              {game.plays.length} {game.plays.length === 1 ? noun[0] : noun[1]}
             </span>
           </h3>
           <ul className="divide-y divide-stone-100">
             {game.plays.map((play) => {
               const key = playKey(play)
-              return (
-                <li key={key}>
-                  <PlayRow
-                    play={play}
-                    team={team}
-                    selected={key === selectedKey}
-                    onSelect={() => onSelect(play)}
-                  />
-                </li>
-              )
+              return <li key={key}>{row(play, key === selectedKey, () => onSelect(play))}</li>
             })}
           </ul>
         </li>
